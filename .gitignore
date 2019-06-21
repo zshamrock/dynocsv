@@ -13,3 +13,5 @@
 
 *.csv
 dynocsv
+vendor/
+*.lock
