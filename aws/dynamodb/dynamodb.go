@@ -8,18 +8,27 @@ import (
 	"io"
 	"log"
 	"strconv"
+	"strings"
 )
 
 var svc *dynamodb.DynamoDB
+
+const (
+	columnsSeparator = ","
+)
 
 func init() {
 	svc = dynamodb.New(awssessions.GetSession())
 }
 
-func ExportToCSV(table string, w io.Writer) []string {
+func ExportToCSV(table string, columns string, w io.Writer) []string {
 	writer := csv.NewWriter(w)
 	attributesSet := make(map[string]bool)
 	attributes := make([]string, 0)
+	if columns != "" {
+		attributes = strings.Split(columns, columnsSeparator)
+		_ = writer.Write(attributes)
+	}
 	err := svc.ScanPages(&dynamodb.ScanInput{TableName: aws.String(table)},
 		func(page *dynamodb.ScanOutput, lastPage bool) bool {
 			for _, item := range page.Items {
@@ -29,9 +38,11 @@ func ExportToCSV(table string, w io.Writer) []string {
 					if value == nil {
 						continue
 					}
-					if !attributesSet[k] {
-						attributesSet[k] = true
-						attributes = append(attributes, k)
+					if columns == "" {
+						if !attributesSet[k] {
+							attributesSet[k] = true
+							attributes = append(attributes, k)
+						}
 					}
 					records[k] = aws.StringValue(value)
 				}
@@ -42,7 +53,6 @@ func ExportToCSV(table string, w io.Writer) []string {
 					} else {
 						orderedRecords = append(orderedRecords, "")
 					}
-
 				}
 				_ = writer.Write(orderedRecords)
 			}

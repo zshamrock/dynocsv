@@ -27,7 +27,7 @@ func main() {
 	app.Metadata = map[string]interface{}{"GitHub": "https://github.com/zshamrock/dynocsv"}
 	app.UsageText = fmt.Sprintf(`%s		 
 		--table/-t <table> 
-		[--columns/-c <commad separated columns>] 
+		[--columns/-c <comma separated columns>] 
 		[--output/-o <output file name>]`,
 		appName)
 	app.Flags = []cli.Flag{
@@ -46,11 +46,15 @@ func main() {
 	}
 	app.Action = action
 
-	app.Run(os.Args)
+	err := app.Run(os.Args)
+	if err != nil {
+		log.Panicf("error encountered while running the app %v", err)
+	}
 }
 
 func action(c *cli.Context) error {
 	table := mustFlag(c, tableFlagName)
+	columns := c.String(columnsFlagName)
 	filename := c.String(outputFlagName)
 	if filename == "" {
 		filename = fmt.Sprintf("%s.csv", table)
@@ -59,8 +63,10 @@ func action(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	headers := dynamodb.ExportToCSV(table, bufio.NewWriter(file))
-	fmt.Println(strings.Join(headers, ","))
+	headers := dynamodb.ExportToCSV(table, columns, bufio.NewWriter(file))
+	if columns == "" {
+		fmt.Println(strings.Join(headers, ","))
+	}
 	return file.Close()
 }
 
