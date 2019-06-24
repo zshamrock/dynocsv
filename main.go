@@ -33,15 +33,15 @@ func main() {
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name:  fmt.Sprintf("%s, t", tableFlagName),
-			Usage: "Table",
+			Usage: "table to export",
 		},
 		cli.StringFlag{
 			Name:  fmt.Sprintf("%s, c", columnsFlagName),
-			Usage: "Columns",
+			Usage: "optional columns to export from the table, if skipped, all columns will be exported",
 		},
 		cli.StringFlag{
 			Name:  fmt.Sprintf("%s, o", outputFlagName),
-			Usage: "Output",
+			Usage: "output file, or the default <table name>.csv will be used",
 		},
 	}
 	app.Action = action
