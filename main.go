@@ -13,6 +13,7 @@ import (
 const (
 	tableFlagName   = "table"
 	columnsFlagName = "columns"
+	limitFlagName   = "limit"
 	outputFlagName  = "output"
 )
 
@@ -28,6 +29,7 @@ func main() {
 	app.UsageText = fmt.Sprintf(`%s		 
 		--table/-t <table> 
 		[--columns/-c <comma separated columns>] 
+		[--limit/-l <number>]
 		[--output/-o <output file name>]`,
 		appName)
 	app.Flags = []cli.Flag{
@@ -38,6 +40,10 @@ func main() {
 		cli.StringFlag{
 			Name:  fmt.Sprintf("%s, c", columnsFlagName),
 			Usage: "optional columns to export from the table, if skipped, all columns will be exported",
+		},
+		cli.UintFlag{
+			Name:  fmt.Sprintf("%s, l", limitFlagName),
+			Usage: "limit number of records returned, if not set all items are fetched",
 		},
 		cli.StringFlag{
 			Name:  fmt.Sprintf("%s, o", outputFlagName),
@@ -63,7 +69,8 @@ func action(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	headers := dynamodb.ExportToCSV(table, columns, bufio.NewWriter(file))
+	limit := c.Uint(limitFlagName)
+	headers := dynamodb.ExportToCSV(table, columns, limit, bufio.NewWriter(file))
 	if columns == "" {
 		fmt.Println(strings.Join(headers, ","))
 	}

@@ -21,7 +21,7 @@ func init() {
 	svc = dynamodb.New(awssessions.GetSession())
 }
 
-func ExportToCSV(table string, columns string, w io.Writer) []string {
+func ExportToCSV(table string, columns string, limit uint, w io.Writer) []string {
 	writer := csv.NewWriter(w)
 	attributesSet := make(map[string]bool)
 	attributes := make([]string, 0)
@@ -29,7 +29,12 @@ func ExportToCSV(table string, columns string, w io.Writer) []string {
 		attributes = strings.Split(columns, columnsSeparator)
 		_ = writer.Write(attributes)
 	}
-	err := svc.ScanPages(&dynamodb.ScanInput{TableName: aws.String(table)},
+	scan := dynamodb.ScanInput{TableName: aws.String(table)}
+	if limit > 0 {
+		scan.Limit = aws.Int64(int64(limit))
+	}
+	processed := 0
+	err := svc.ScanPages(&scan,
 		func(page *dynamodb.ScanOutput, lastPage bool) bool {
 			for _, item := range page.Items {
 				records := make(map[string]string)
@@ -55,6 +60,11 @@ func ExportToCSV(table string, columns string, w io.Writer) []string {
 					}
 				}
 				_ = writer.Write(orderedRecords)
+				processed++
+				if limit > 0 && processed == int(limit) {
+					writer.Flush()
+					return false
+				}
 			}
 			writer.Flush()
 			return !lastPage
