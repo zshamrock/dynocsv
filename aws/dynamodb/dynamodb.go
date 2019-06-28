@@ -7,6 +7,7 @@ import (
 	awssessions "github.com/zshamrock/dynocsv/aws"
 	"io"
 	"log"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -34,6 +35,8 @@ func ExportToCSV(table string, columns string, limit uint, w io.Writer) []string
 		scan.Limit = aws.Int64(int64(limit))
 	}
 	processed := 0
+	// do not sort user defined columns
+	sorted := columns != ""
 	err := svc.ScanPages(&scan,
 		func(page *dynamodb.ScanOutput, lastPage bool) bool {
 			for _, item := range page.Items {
@@ -50,6 +53,12 @@ func ExportToCSV(table string, columns string, limit uint, w io.Writer) []string
 						}
 					}
 					records[k] = aws.StringValue(value)
+				}
+				if !sorted {
+					sort.Slice(attributes, func(i, j int) bool {
+						return attributes[i] < attributes[j]
+					})
+					sorted = true
 				}
 				orderedRecords := make([]string, 0, len(attributes))
 				for _, attr := range attributes {
