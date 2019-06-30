@@ -45,7 +45,7 @@ func main() {
 		},
 		cli.UintFlag{
 			Name:  fmt.Sprintf("%s, l", limitFlagName),
-			Usage: "limit number of records returned, if not set all items are fetched",
+			Usage: "limit number of records returned, if not set (i.e. 0) all items are fetched",
 		},
 		cli.StringFlag{
 			Name: fmt.Sprintf("%s, p", profileFlagName),
