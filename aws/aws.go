@@ -9,19 +9,26 @@ const (
 	profileNameEnvVar = "AWS_PROFILE"
 )
 
-var sess *session.Session
+func GetSession(profile string) *session.Session {
+	p := profile
+	if profile == "" {
+		p = getEnvProfileNameOrDefault()
+	}
+	return setupSession(p)
+}
 
-func init() {
+func getEnvProfileNameOrDefault() string {
 	profile, ok := os.LookupEnv(profileNameEnvVar)
 	if !ok {
 		profile = session.DefaultSharedConfigProfile
 	}
-	sess = session.Must(session.NewSessionWithOptions(session.Options{
+	return profile
+}
+
+func setupSession(profile string) *session.Session {
+	sess := session.Must(session.NewSessionWithOptions(session.Options{
 		Profile:           profile,
 		SharedConfigState: session.SharedConfigEnable,
 	}))
-}
-
-func GetSession() *session.Session {
 	return sess
 }

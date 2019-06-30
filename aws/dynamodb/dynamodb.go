@@ -12,17 +12,12 @@ import (
 	"strings"
 )
 
-var svc *dynamodb.DynamoDB
-
 const (
 	columnsSeparator = ","
 )
 
-func init() {
-	svc = dynamodb.New(awssessions.GetSession())
-}
-
-func ExportToCSV(table string, columns string, limit uint, w io.Writer) []string {
+func ExportToCSV(profile string, table string, columns string, limit uint, w io.Writer) []string {
+	svc := dynamodb.New(awssessions.GetSession(profile))
 	writer := csv.NewWriter(w)
 	attributesSet := make(map[string]bool)
 	attributes := make([]string, 0)

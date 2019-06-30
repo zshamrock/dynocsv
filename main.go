@@ -14,6 +14,7 @@ const (
 	tableFlagName   = "table"
 	columnsFlagName = "columns"
 	limitFlagName   = "limit"
+	profileFlagName = "profile"
 	outputFlagName  = "output"
 )
 
@@ -30,6 +31,7 @@ func main() {
 		--table/-t <table> 
 		[--columns/-c <comma separated columns>] 
 		[--limit/-l <number>]
+		[--profile/-p <AWS profile>]
 		[--output/-o <output file name>]`,
 		appName)
 	app.Flags = []cli.Flag{
@@ -44,6 +46,11 @@ func main() {
 		cli.UintFlag{
 			Name:  fmt.Sprintf("%s, l", limitFlagName),
 			Usage: "limit number of records returned, if not set all items are fetched",
+		},
+		cli.StringFlag{
+			Name: fmt.Sprintf("%s, p", profileFlagName),
+			Usage: "AWS profile to use to connect to DynamoDB, otherwise the value from AWS_PROFILE env var is used " +
+				"if available, or then \"default\" if it is not set or empty",
 		},
 		cli.StringFlag{
 			Name:  fmt.Sprintf("%s, o", outputFlagName),
@@ -70,7 +77,8 @@ func action(c *cli.Context) error {
 		return err
 	}
 	limit := c.Uint(limitFlagName)
-	headers := dynamodb.ExportToCSV(table, columns, limit, bufio.NewWriter(file))
+	profile := c.String(profileFlagName)
+	headers := dynamodb.ExportToCSV(profile, table, columns, limit, bufio.NewWriter(file))
 	if columns == "" {
 		fmt.Println(strings.Join(headers, ","))
 	}
