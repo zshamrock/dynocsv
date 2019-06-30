@@ -66,6 +66,9 @@ func main() {
 }
 
 func action(c *cli.Context) error {
+	if len(os.Args) == 1 {
+		cli.ShowAppHelpAndExit(c, 0)
+	}
 	table := mustFlag(c, tableFlagName)
 	columns := c.String(columnsFlagName)
 	filename := c.String(outputFlagName)
