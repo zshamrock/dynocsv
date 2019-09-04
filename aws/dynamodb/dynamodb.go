@@ -2,6 +2,7 @@ package dynamodb
 
 import (
 	"encoding/csv"
+	"encoding/json"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	awssessions "github.com/zshamrock/dynocsv/aws"
@@ -87,6 +88,19 @@ func getValue(av *dynamodb.AttributeValue) *string {
 		return av.N
 	case av.S != nil:
 		return av.S
+	case len(av.M) != 0:
+		data := make(map[string]string)
+		for k, v := range av.M {
+			value := getValue(v)
+			if value != nil {
+				data[k] = aws.StringValue(value)
+			}
+		}
+		b, err := json.Marshal(data)
+		if err != nil {
+			return nil
+		}
+		return aws.String(string(b))
 	default:
 		return nil
 	}
