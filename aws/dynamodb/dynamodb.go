@@ -14,7 +14,8 @@ import (
 )
 
 const (
-	columnsSeparator = ","
+	columnsSeparator         = ","
+	stringSetValuesSeparator = ":"
 )
 
 func ExportToCSV(profile string, table string, columns string, limit uint, w io.Writer) []string {
@@ -80,6 +81,29 @@ func ExportToCSV(profile string, table string, columns string, limit uint, w io.
 	return attributes
 }
 
+/*
+switch {
+	case len(av.B) != 0:
+		return d.decodeBinary(av.B, v)
+	case av.BOOL != nil:
+		return d.decodeBool(av.BOOL, v)
+	case len(av.BS) != 0:
+		return d.decodeBinarySet(av.BS, v)
+	case len(av.L) != 0:
+		return d.decodeList(av.L, v)
+	case len(av.M) != 0:
+		return d.decodeMap(av.M, v)
+	case av.N != nil:
+		return d.decodeNumber(av.N, v, fieldTag)
+	case len(av.NS) != 0:
+		return d.decodeNumberSet(av.NS, v)
+	case av.S != nil:
+		return d.decodeString(av.S, v, fieldTag)
+	case len(av.SS) != 0:
+		return d.decodeStringSet(av.SS, v)
+	}
+*/
+
 func getValue(av *dynamodb.AttributeValue) *string {
 	switch {
 	case av.BOOL != nil:
@@ -101,6 +125,12 @@ func getValue(av *dynamodb.AttributeValue) *string {
 			return nil
 		}
 		return aws.String(string(b))
+	case len(av.SS) != 0:
+		data := make([]string, 0, len(av.SS))
+		for _, v := range av.SS {
+			data = append(data, aws.StringValue(v))
+		}
+		return aws.String(strings.Join(data, stringSetValuesSeparator))
 	default:
 		return nil
 	}
