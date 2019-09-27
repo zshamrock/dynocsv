@@ -3,6 +3,7 @@ package dynamodb
 import (
 	"encoding/csv"
 	"encoding/json"
+	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	awssessions "github.com/zshamrock/dynocsv/aws"
@@ -14,8 +15,8 @@ import (
 )
 
 const (
-	columnsSeparator         = ","
-	stringSetValuesSeparator = ":"
+	columnsSeparator   = ","
+	setValuesSeparator = ","
 )
 
 func ExportToCSV(profile string, table string, columns string, limit uint, w io.Writer) []string {
@@ -126,12 +127,27 @@ func getValue(av *dynamodb.AttributeValue) *string {
 		}
 		return aws.String(string(b))
 	case len(av.SS) != 0:
-		data := make([]string, 0, len(av.SS))
-		for _, v := range av.SS {
-			data = append(data, aws.StringValue(v))
-		}
-		return aws.String(strings.Join(data, stringSetValuesSeparator))
+		return processStringSet(av.SS)
+	case len(av.NS) != 0:
+		return processNumberSet(av.NS)
 	default:
 		return nil
 	}
+}
+
+func processStringSet(values []*string) *string {
+	data := make([]string, 0, len(values))
+	for _, v := range values {
+		data = append(data, aws.StringValue(v))
+	}
+	return aws.String(fmt.Sprint("[", strings.Join(data, setValuesSeparator), "]"))
+}
+
+func processNumberSet(values []*string) *string {
+	data := make([]float64, 0, len(values))
+	for _, v := range values {
+		f, _ := strconv.ParseFloat(aws.StringValue(v), 64)
+		data = append(data, f)
+	}
+	return aws.String(strings.Join(strings.Fields(fmt.Sprint(data)), setValuesSeparator))
 }
