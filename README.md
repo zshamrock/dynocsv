@@ -1,6 +1,6 @@
 # dynocsv
 
-Exports DynamoDB table into CSV [![Build Status](https://travis-ci.org/zshamrock/vmx.svg?branch=master)](https://travis-ci.org/zshamrock/dynocsv) [![Snap Status](https://build.snapcraft.io/badge/zshamrock/dynocsv.svg)](https://build.snapcraft.io/user/zshamrock/dynocsv)
+Exports DynamoDB table into CSV [![Build Status](https://travis-ci.org/zshamrock/vmx.svg?branch=master)](https://travis-ci.org/zshamrock/dynocsv) [![dynocsv](https://snapcraft.io/dynocsv/badge.svg)](https://snapcraft.io/dynocsv)                                                                                                                                                    
 
 ```
 NAME:

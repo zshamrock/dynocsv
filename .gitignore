@@ -15,3 +15,4 @@
 dynocsv
 vendor/
 *.lock
+*.snap
