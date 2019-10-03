@@ -10,15 +10,31 @@ base: core18
 grade: devel
 license: MIT
 
+plugs:
+  home:
+    read: all
+  aws:
+    interface: personal-files
+    read:
+      - $HOME/.aws/config
+      - $HOME/.aws/credentials
+
 parts:
   dynocsv:
     plugin: go
-    source-type: git
-    source: https://github.com/zshamrock/dynocsv
+#    source-type: git
+    source-type: local
+#    source: https://github.com/zshamrock/dynocsv
+    source: .
     go-importpath: github.com/zshamrock/dynocsv
     build-packages:
       - gcc
+      - git
 
 apps:
   dynocsv:
     command: dynocsv
+    plugs:
+      - aws
+      - network
+      - desktop
