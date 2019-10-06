@@ -100,7 +100,7 @@ func TestGetSession(t *testing.T) {
 	}
 	for _, tt := range tests {
 		dir, _ := os.Getwd()
-		home, _ := os.UserHomeDir()
+		home := os.ExpandEnv("$" + homeEnvName)
 		_ = os.Setenv(homeEnvName, filepath.Join(dir, tt.homeSuffix))
 		for k, v := range tt.envs {
 			_ = os.Setenv(k, v)
