@@ -4,7 +4,7 @@ summary: Exports DynamoDB table into CSV # 79 char long summary
 description: |
   Exports DynamoDB table into CSV, additionally can filter out the specific columns and limit number of items to be exported.
 
-confinement: classic # use 'strict' once you have the right plugs and slots
+confinement: strict # use 'strict' once you have the right plugs and slots
 base: core18
 #grade: stable # must be 'stable' to release into candidate/stable channels
 grade: stable
@@ -25,3 +25,7 @@ parts:
 apps:
   dynocsv:
     command: dynocsv
+    plugs:
+      - network
+      - removable-media
+      - home
