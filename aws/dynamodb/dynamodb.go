@@ -40,8 +40,8 @@ func ExportToCSV(profile string, table string, columns string, limit uint, w io.
 			for _, item := range page.Items {
 				records := make(map[string]string)
 				for k, av := range item {
-					value := getValue(av)
-					if value == nil {
+					value, handled := getValue(av)
+					if !handled {
 						continue
 					}
 					if columns == "" {
@@ -50,7 +50,7 @@ func ExportToCSV(profile string, table string, columns string, limit uint, w io.
 							attributes = append(attributes, k)
 						}
 					}
-					records[k] = aws.StringValue(value)
+					records[k] = value
 				}
 				if !sorted {
 					sort.Slice(attributes, func(i, j int) bool {
@@ -82,72 +82,51 @@ func ExportToCSV(profile string, table string, columns string, limit uint, w io.
 	return attributes
 }
 
-/*
-switch {
-	case len(av.B) != 0:
-		return d.decodeBinary(av.B, v)
-	case av.BOOL != nil:
-		return d.decodeBool(av.BOOL, v)
-	case len(av.BS) != 0:
-		return d.decodeBinarySet(av.BS, v)
-	case len(av.L) != 0:
-		return d.decodeList(av.L, v)
-	case len(av.M) != 0:
-		return d.decodeMap(av.M, v)
-	case av.N != nil:
-		return d.decodeNumber(av.N, v, fieldTag)
-	case len(av.NS) != 0:
-		return d.decodeNumberSet(av.NS, v)
-	case av.S != nil:
-		return d.decodeString(av.S, v, fieldTag)
-	case len(av.SS) != 0:
-		return d.decodeStringSet(av.SS, v)
-	}
-*/
-
-func getValue(av *dynamodb.AttributeValue) *string {
+func getValue(av *dynamodb.AttributeValue) (string, bool) {
 	switch {
 	case av.BOOL != nil:
-		return aws.String(strconv.FormatBool(aws.BoolValue(av.BOOL)))
+		return strconv.FormatBool(aws.BoolValue(av.BOOL)), true
 	case av.N != nil:
-		return av.N
+		return aws.StringValue(av.N), true
 	case av.S != nil:
-		return av.S
+		return aws.StringValue(av.S), true
 	case len(av.M) != 0:
 		data := make(map[string]string)
 		for k, v := range av.M {
-			value := getValue(v)
-			if value != nil {
-				data[k] = aws.StringValue(value)
+			value, handled := getValue(v)
+			if handled {
+				data[k] = value
 			}
 		}
 		b, err := json.Marshal(data)
 		if err != nil {
-			return nil
+			return "", false
 		}
-		return aws.String(string(b))
+		return string(b), true
 	case len(av.SS) != 0:
-		return processStringSet(av.SS)
+		return processStringSet(av.SS), true
 	case len(av.NS) != 0:
-		return processNumberSet(av.NS)
+		return processNumberSet(av.NS), true
+	//case len(av.L) != 0:
+	//	return processList(av.L)
 	default:
-		return nil
+		return "", false
 	}
 }
 
-func processStringSet(values []*string) *string {
+func processStringSet(values []*string) string {
 	data := make([]string, 0, len(values))
 	for _, v := range values {
 		data = append(data, aws.StringValue(v))
 	}
-	return aws.String(fmt.Sprint("[", strings.Join(data, setValuesSeparator), "]"))
+	return fmt.Sprint("[", strings.Join(data, setValuesSeparator), "]")
 }
 
-func processNumberSet(values []*string) *string {
+func processNumberSet(values []*string) string {
 	data := make([]float64, 0, len(values))
 	for _, v := range values {
 		f, _ := strconv.ParseFloat(aws.StringValue(v), 64)
 		data = append(data, f)
 	}
-	return aws.String(strings.Join(strings.Fields(fmt.Sprint(data)), setValuesSeparator))
+	return strings.Join(strings.Fields(fmt.Sprint(data)), setValuesSeparator)
 }
