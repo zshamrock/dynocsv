@@ -17,6 +17,8 @@ import (
 const (
 	columnsSeparator   = ","
 	setValuesSeparator = ","
+	setOpenSymbol      = "["
+	setCloseSymbol     = "]"
 )
 
 func ExportToCSV(profile string, table string, columns string, limit uint, w io.Writer) []string {
@@ -104,29 +106,22 @@ func getValue(av *dynamodb.AttributeValue) (string, bool) {
 		}
 		return string(b), true
 	case len(av.SS) != 0:
-		return processStringSet(av.SS), true
+		return processSet(av.SS), true
 	case len(av.NS) != 0:
-		return processNumberSet(av.NS), true
-	//case len(av.L) != 0:
-	//	return processList(av.L)
+		return processSet(av.NS), true
 	default:
 		return "", false
 	}
 }
 
-func processStringSet(values []*string) string {
+func processSet(values []*string) string {
 	data := make([]string, 0, len(values))
 	for _, v := range values {
 		data = append(data, aws.StringValue(v))
 	}
-	return fmt.Sprint("[", strings.Join(data, setValuesSeparator), "]")
+	return buildSetOutput(data)
 }
 
-func processNumberSet(values []*string) string {
-	data := make([]float64, 0, len(values))
-	for _, v := range values {
-		f, _ := strconv.ParseFloat(aws.StringValue(v), 64)
-		data = append(data, f)
-	}
-	return strings.Join(strings.Fields(fmt.Sprint(data)), setValuesSeparator)
+func buildSetOutput(data []string) string {
+	return fmt.Sprint(setOpenSymbol, strings.Join(data, setValuesSeparator), setCloseSymbol)
 }
