@@ -70,8 +70,10 @@ If no explicit profile value is set, it looks for the env var `$AWS_PROFILE` if 
 
 Currently there are the following limitations:
 
-- only `String`, `Boolean`, `Number`, `Map`, `StringSet` and `NumberSet` data types are supported to export the data from, attributes with other data type will still be present, but the value will be "" (empty string)
-- there is no pause or proper throttling according to the current set table's RCU, so you might need manually to increase the RCU value temporarily for the period of running the export
+- `String`, `Boolean`, `Number`, `Map`, `StringSet`, `NumberSet` and `List` data types are supported to export the data 
+    from, attributes with other data type will still be present, but the value will be "" (empty string)
+- there is no pause or proper throttling according to the current set table's RCU, so you might need manually to 
+    increase the RCU value temporarily for the period of running the export
     
 ## Copyright                                                                                                                                                 
                                                                                                                                                              

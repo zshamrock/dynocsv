@@ -15,10 +15,13 @@ import (
 )
 
 const (
-	columnsSeparator   = ","
-	setValuesSeparator = ","
-	setOpenSymbol      = "["
-	setCloseSymbol     = "]"
+	columnsSeparator    = ","
+	setValuesSeparator  = ","
+	setOpenSymbol       = "["
+	setCloseSymbol      = "]"
+	listValuesSeparator = ","
+	listOpenSymbol      = "["
+	listCloseSymbol     = "]"
 )
 
 func ExportToCSV(profile string, table string, columns string, limit uint, w io.Writer) []string {
@@ -84,6 +87,7 @@ func ExportToCSV(profile string, table string, columns string, limit uint, w io.
 	return attributes
 }
 
+// TODO: For the container data types, the length for the empty will be 0, although it would be better to return [] instead of ""
 func getValue(av *dynamodb.AttributeValue) (string, bool) {
 	switch {
 	case av.BOOL != nil:
@@ -109,6 +113,8 @@ func getValue(av *dynamodb.AttributeValue) (string, bool) {
 		return processSet(av.SS), true
 	case len(av.NS) != 0:
 		return processSet(av.NS), true
+	case len(av.L) != 0:
+		return processList(av.L), true
 	default:
 		return "", false
 	}
@@ -119,9 +125,18 @@ func processSet(values []*string) string {
 	for _, v := range values {
 		data = append(data, aws.StringValue(v))
 	}
-	return buildSetOutput(data)
+	return buildOutput(data, setOpenSymbol, setCloseSymbol, setValuesSeparator)
 }
 
-func buildSetOutput(data []string) string {
-	return fmt.Sprint(setOpenSymbol, strings.Join(data, setValuesSeparator), setCloseSymbol)
+func processList(values []*dynamodb.AttributeValue) string {
+	data := make([]string, 0, len(values))
+	for _, v := range values {
+		value, _ := getValue(v)
+		data = append(data, value)
+	}
+	return buildOutput(data, listOpenSymbol, listCloseSymbol, listValuesSeparator)
+}
+
+func buildOutput(data []string, openSymbol string, closeSymbol string, separator string) string {
+	return fmt.Sprint(openSymbol, strings.Join(data, separator), closeSymbol)
 }

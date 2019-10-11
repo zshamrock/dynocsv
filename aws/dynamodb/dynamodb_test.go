@@ -95,3 +95,67 @@ func TestProcessStringSet(t *testing.T) {
 		})
 	}
 }
+
+func TestProcessStringList(t *testing.T) {
+	type args struct {
+		values []*dynamodb.AttributeValue
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "empty list",
+			args: args{values: []*dynamodb.AttributeValue{}},
+			want: "[]",
+		},
+		{
+			name: "single entry list",
+			args: args{values: []*dynamodb.AttributeValue{{N: aws.String("10")}}},
+			want: "[10]",
+		},
+		{
+			name: "multiple different entries list",
+			args: args{values: []*dynamodb.AttributeValue{
+				{N: aws.String("10")},
+				{S: aws.String("Zebra")},
+				{BOOL: aws.Bool(true)},
+				{B: []byte{}},
+			}},
+			want: "[10,Zebra,true,]",
+		},
+		{
+			name: "multiple different composite entries list",
+			args: args{values: []*dynamodb.AttributeValue{
+				{N: aws.String("10")},
+				{S: aws.String("Zebra")},
+				{BOOL: aws.Bool(true)},
+				{B: []byte{}},
+				{L: []*dynamodb.AttributeValue{
+					{N: aws.String("10")},
+					{N: aws.String("3.14")},
+				}},
+				{NS: []*string{aws.String("5"), aws.String("3")}},
+				{SS: []*string{aws.String("Giraffe"), aws.String("Hippo"), aws.String("Zebra"), aws.String("3.14")}},
+				{L: []*dynamodb.AttributeValue{
+					{L: []*dynamodb.AttributeValue{
+						{L: []*dynamodb.AttributeValue{
+							{N: aws.String("-7")},
+							{NS: []*string{aws.String("1"), aws.String("3")}},
+							{SS: []*string{aws.String("Hippo")}},
+						}},
+					}},
+				}},
+			}},
+			want: "[10,Zebra,true,,[10,3.14],[5,3],[Giraffe,Hippo,Zebra,3.14],[[[-7,[1,3],[Hippo]]]]]",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := processList(tt.args.values); got != tt.want {
+				t.Errorf("processList() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
