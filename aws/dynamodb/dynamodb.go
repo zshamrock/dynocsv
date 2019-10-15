@@ -87,7 +87,6 @@ func ExportToCSV(profile string, table string, columns string, limit uint, w io.
 	return attributes
 }
 
-// TODO: For the container data types, the length for the empty will be 0, although it would be better to return [] instead of ""
 func getValue(av *dynamodb.AttributeValue) (string, bool) {
 	switch {
 	case av.BOOL != nil:
@@ -96,28 +95,32 @@ func getValue(av *dynamodb.AttributeValue) (string, bool) {
 		return aws.StringValue(av.N), true
 	case av.S != nil:
 		return aws.StringValue(av.S), true
-	case len(av.M) != 0:
-		data := make(map[string]string)
-		for k, v := range av.M {
-			value, handled := getValue(v)
-			if handled {
-				data[k] = value
-			}
-		}
-		b, err := json.Marshal(data)
-		if err != nil {
-			return "", false
-		}
-		return string(b), true
-	case len(av.SS) != 0:
+	case av.M != nil:
+		return processMap(av)
+	case av.SS != nil:
 		return processSet(av.SS), true
-	case len(av.NS) != 0:
+	case av.NS != nil:
 		return processSet(av.NS), true
-	case len(av.L) != 0:
+	case av.L != nil:
 		return processList(av.L), true
 	default:
 		return "", false
 	}
+}
+
+func processMap(av *dynamodb.AttributeValue) (string, bool) {
+	data := make(map[string]string)
+	for k, v := range av.M {
+		value, handled := getValue(v)
+		if handled {
+			data[k] = value
+		}
+	}
+	b, err := json.Marshal(data)
+	if err != nil {
+		return "", false
+	}
+	return string(b), true
 }
 
 func processSet(values []*string) string {

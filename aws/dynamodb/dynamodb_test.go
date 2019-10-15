@@ -3,11 +3,9 @@ package dynamodb
 import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"reflect"
 	"testing"
 )
 
-// TODO: Implement
 func TestGetValue(t *testing.T) {
 	type args struct {
 		av *dynamodb.AttributeValue
@@ -17,12 +15,132 @@ func TestGetValue(t *testing.T) {
 		args args
 		want string
 	}{
-		// TODO: Add test cases.
+		{
+			name: "get positive number value",
+			args: args{av: &dynamodb.AttributeValue{N: aws.String("10")}},
+			want: "10",
+		},
+		{
+			name: "get negative number value",
+			args: args{av: &dynamodb.AttributeValue{N: aws.String("-10")}},
+			want: "-10",
+		},
+		{
+			name: "get positive floating point number value",
+			args: args{av: &dynamodb.AttributeValue{N: aws.String("3.14")}},
+			want: "3.14",
+		},
+		{
+			name: "get negative floating point number value",
+			args: args{av: &dynamodb.AttributeValue{N: aws.String("-3.14")}},
+			want: "-3.14",
+		},
+		{
+			name: "get true boolean value",
+			args: args{av: &dynamodb.AttributeValue{BOOL: aws.Bool(true)}},
+			want: "true",
+		},
+		{
+			name: "get false boolean value",
+			args: args{av: &dynamodb.AttributeValue{BOOL: aws.Bool(false)}},
+			want: "false",
+		},
+		{
+			name: "get empty string value",
+			args: args{av: &dynamodb.AttributeValue{S: aws.String("")}},
+			want: "",
+		},
+		{
+			name: "get not empty string value",
+			args: args{av: &dynamodb.AttributeValue{S: aws.String("Hippo")}},
+			want: "Hippo",
+		},
+		{
+			name: "get empty map value",
+			args: args{av: &dynamodb.AttributeValue{M: map[string]*dynamodb.AttributeValue{}}},
+			want: "{}",
+		},
+		{
+			name: "get not empty map value",
+			args: args{av: &dynamodb.AttributeValue{M: map[string]*dynamodb.AttributeValue{"x": {S: aws.String("y")}}}},
+			want: `{"x":"y"}`,
+		},
+		{
+			name: "get empty list value",
+			args: args{av: &dynamodb.AttributeValue{L: []*dynamodb.AttributeValue{}}},
+			want: "[]",
+		},
+		{
+			name: "get not empty list value",
+			args: args{av: &dynamodb.AttributeValue{L: []*dynamodb.AttributeValue{{S: aws.String("x")}}}},
+			want: "[x]",
+		},
+		{
+			name: "get empty string set value",
+			args: args{av: &dynamodb.AttributeValue{SS: []*string{}}},
+			want: "[]",
+		},
+		{
+			name: "get not empty string set value",
+			args: args{av: &dynamodb.AttributeValue{SS: []*string{aws.String("x")}}},
+			want: "[x]",
+		},
+		{
+			name: "get empty number set value",
+			args: args{av: &dynamodb.AttributeValue{NS: []*string{}}},
+			want: "[]",
+		},
+		{
+			name: "get not empty number set value",
+			args: args{av: &dynamodb.AttributeValue{NS: []*string{aws.String("10")}}},
+			want: "[10]",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got, _ := getValue(tt.args.av); !reflect.DeepEqual(got, tt.want) {
+			if got, _ := getValue(tt.args.av); got != tt.want {
 				t.Errorf("getValue() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestProcessMap(t *testing.T) {
+	type args struct {
+		value *dynamodb.AttributeValue
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "empty map",
+			args: args{value: &dynamodb.AttributeValue{
+				M: map[string]*dynamodb.AttributeValue{}}},
+			want: "{}",
+		},
+		{
+			name: "not empty map",
+			args: args{value: &dynamodb.AttributeValue{
+				M: map[string]*dynamodb.AttributeValue{
+					"type":    {S: aws.String("animal")},
+					"name":    {S: aws.String("Hippo")},
+					"weight":  {N: aws.String("56.78")},
+					"friends": {L: []*dynamodb.AttributeValue{{S: aws.String("Zebra")}, {S: aws.String("Giraffe")}}},
+					"family": {M: map[string]*dynamodb.AttributeValue{
+						"wife": {S: aws.String("Pretty Hippo")},
+						"kid":  {S: aws.String("Smart Kid")}},
+					},
+					"hobbies": {SS: []*string{aws.String("swimming"), aws.String("sleeping")}},
+				}}},
+			want: `{"family":"{\"kid\":\"Smart Kid\",\"wife\":\"Pretty Hippo\"}","friends":"[Zebra,Giraffe]","hobbies":"[swimming,sleeping]","name":"Hippo","type":"animal","weight":"56.78"}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got, ok := processMap(tt.args.value); ok && got != tt.want {
+				t.Errorf("processMap() = %v, want %v", got, tt.want)
 			}
 		})
 	}
