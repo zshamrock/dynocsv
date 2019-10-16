@@ -11,11 +11,12 @@ import (
 )
 
 const (
-	tableFlagName   = "table"
-	columnsFlagName = "columns"
-	limitFlagName   = "limit"
-	profileFlagName = "profile"
-	outputFlagName  = "output"
+	tableFlagName       = "table"
+	columnsFlagName     = "columns"
+	skipColumnsFlagName = "skip-columns"
+	limitFlagName       = "limit"
+	profileFlagName     = "profile"
+	outputFlagName      = "output"
 )
 
 const appName = "dynocsv"
@@ -28,20 +29,30 @@ func main() {
 	app.Author = "(c) Aliaksandr Kazlou"
 	app.Metadata = map[string]interface{}{"GitHub": "https://github.com/zshamrock/dynocsv"}
 	app.UsageText = fmt.Sprintf(`%s		 
-		--table/-t <table> 
-		[--columns/-c <comma separated columns>] 
-		[--limit/-l <number>]
-		[--profile/-p <AWS profile>]
-		[--output/-o <output file name>]`,
+		--table/-t          <table> 
+		[--columns/-c       <comma separated columns>] 
+		[--skip-columns/-sc <comma separated columns to skip>] 
+		[--limit/-l         <number>]
+		[--profile/-p       <AWS profile>]
+		[--output/-o        <output file name>]`,
 		appName)
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
-			Name:  fmt.Sprintf("%s, t", tableFlagName),
-			Usage: "table to export",
+			Name:     fmt.Sprintf("%s, t", tableFlagName),
+			Usage:    "table to export",
+			Required: true,
 		},
 		cli.StringFlag{
-			Name:  fmt.Sprintf("%s, c", columnsFlagName),
-			Usage: "optional columns to export from the table, if skipped, all columns will be exported",
+			Name: fmt.Sprintf("%s, c", columnsFlagName),
+			Usage: fmt.Sprintf(
+				"columns to export from the table, if omitted, all columns will be exported "+
+					"(muttaly exclusive with \"%s\")", skipColumnsFlagName),
+		},
+		cli.StringFlag{
+			Name: fmt.Sprintf("%s, sc", skipColumnsFlagName),
+			Usage: fmt.Sprintf(
+				"columns skipped from export from the table, if omitted, all columns will be exported "+
+					"(muttaly exclusive with \"%s\")", columnsFlagName),
 		},
 		cli.UintFlag{
 			Name:  fmt.Sprintf("%s, l", limitFlagName),
@@ -71,6 +82,12 @@ func action(c *cli.Context) error {
 	}
 	table := mustFlag(c, tableFlagName)
 	columns := c.String(columnsFlagName)
+	skipColumns := c.String(skipColumnsFlagName)
+	if columns != "" && skipColumns != "" {
+		fmt.Printf("Both \"%s\" and \"%s\" are provided, they are mutually exclusive, please, use one.\n",
+			columnsFlagName, skipColumnsFlagName)
+		os.Exit(1)
+	}
 	filename := c.String(outputFlagName)
 	if filename == "" {
 		filename = fmt.Sprintf("%s.csv", table)
@@ -81,7 +98,7 @@ func action(c *cli.Context) error {
 	}
 	limit := c.Uint(limitFlagName)
 	profile := c.String(profileFlagName)
-	headers := dynamodb.ExportToCSV(profile, table, columns, limit, bufio.NewWriter(file))
+	headers := dynamodb.ExportToCSV(profile, table, columns, skipColumns, limit, bufio.NewWriter(file))
 	if columns == "" {
 		fmt.Println(strings.Join(headers, ","))
 	}

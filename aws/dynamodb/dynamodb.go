@@ -24,7 +24,7 @@ const (
 	listCloseSymbol     = "]"
 )
 
-func ExportToCSV(profile string, table string, columns string, limit uint, w io.Writer) []string {
+func ExportToCSV(profile string, table string, columns string, skipColumns string, limit uint, w io.Writer) []string {
 	svc := dynamodb.New(awssessions.GetSession(profile))
 	writer := csv.NewWriter(w)
 	attributesSet := make(map[string]bool)
@@ -32,6 +32,12 @@ func ExportToCSV(profile string, table string, columns string, limit uint, w io.
 	if columns != "" {
 		attributes = strings.Split(columns, columnsSeparator)
 		_ = writer.Write(attributes)
+	}
+	skipAttributes := make(map[string]bool)
+	if skipColumns != "" {
+		for _, attr := range strings.Split(skipColumns, columnsSeparator) {
+			skipAttributes[attr] = true
+		}
 	}
 	scan := dynamodb.ScanInput{TableName: aws.String(table)}
 	if limit > 0 {
@@ -50,7 +56,7 @@ func ExportToCSV(profile string, table string, columns string, limit uint, w io.
 						continue
 					}
 					if columns == "" {
-						if !attributesSet[k] {
+						if _, skip := skipAttributes[k]; !skip && !attributesSet[k] {
 							attributesSet[k] = true
 							attributes = append(attributes, k)
 						}
