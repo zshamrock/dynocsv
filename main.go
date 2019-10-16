@@ -38,9 +38,8 @@ func main() {
 		appName)
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
-			Name:     fmt.Sprintf("%s, t", tableFlagName),
-			Usage:    "table to export",
-			Required: true,
+			Name:  fmt.Sprintf("%s, t", tableFlagName),
+			Usage: "table to export",
 		},
 		cli.StringFlag{
 			Name: fmt.Sprintf("%s, c", columnsFlagName),
