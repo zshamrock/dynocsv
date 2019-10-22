@@ -23,7 +23,7 @@ parts:
       - git
 
 plugs:
-  aws-profile:
+  aws-config-credentials:
     interface: personal-files
     read:
       - $HOME/.aws/config
@@ -36,4 +36,4 @@ apps:
       - network
       - removable-media
       - home
-      - aws-profile
+      - aws-config-credentials
