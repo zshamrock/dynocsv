@@ -53,6 +53,15 @@ Or using `snap`:
                                                                                                                                                              
 [![Get it from the Snap Store](https://snapcraft.io/static/images/badges/en/snap-store-black.svg)](https://snapcraft.io/dynocsv)
 
+*Note*: for Snap you would need explicitly allow `aws-config-credetials` plug which reads data from `$HOME/.aws` by 
+running:
+```
+snap connect dynocsv:aws-config-credentials
+```
+otherwise it fails to read the credentials and will fail with 
+> 019/10/24 17:34:14 MissingRegion: could not find region configuration
+   panic: MissingRegion: could not find region configuration
+
 ## Usage                                                                                                                                                     
                                                                                                                                                              
     $ dynocsv -t <table name>

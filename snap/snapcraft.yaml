@@ -2,7 +2,11 @@ name: dynocsv # you probably want to 'snapcraft register <name>'
 version: '1.0.0' # just for humans, typically '1.2+git' or '1.3.2'
 summary: Exports DynamoDB table into CSV # 79 char long summary
 description: |
-  Exports DynamoDB table into CSV, additionally can filter out the specific columns and limit number of items to be exported.
+  Exports DynamoDB table into CSV, additionally can filter out specific columns and limit the number of items to be exported.
+
+  The tool relies on reading AWS profile config credentials (`$HOME/.aws`), so when installed you would need explicitly allow this access by running:
+
+  `snap connect dynocsv:aws-config-credentials`
 
 confinement: strict # use 'strict' once you have the right plugs and slots
 base: core18
