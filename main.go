@@ -97,7 +97,7 @@ func action(c *cli.Context) error {
 	}
 	limit := c.Uint(limitFlagName)
 	profile := c.String(profileFlagName)
-	headers := dynamodb.ExportToCSV(profile, table, columns, skipColumns, limit, bufio.NewWriter(file))
+	headers := dynamodb.ExportToCSV(profile, table, &dynamodb.QueryParams{}, columns, skipColumns, limit, bufio.NewWriter(file))
 	if columns == "" {
 		fmt.Println(strings.Join(headers, ","))
 	}

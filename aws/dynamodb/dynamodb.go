@@ -24,7 +24,69 @@ const (
 	listCloseSymbol     = "]"
 )
 
-func ExportToCSV(profile string, table string, columns string, skipColumns string, limit uint, w io.Writer) []string {
+type QueryParams struct {
+	Hash           string
+	Sort           string
+	SortGt         string
+	SortGe         string
+	SortLt         string
+	SortLe         string
+	SortBeginsWith string
+	SortBetween    []string
+}
+
+func (qp *QueryParams) HashQueryString(key *dynamodb.KeySchemaElement, outParams map[string]string) string {
+	outParams[":hash1"] = qp.Hash
+	return aws.StringValue(key.AttributeName) + " = :hash1"
+}
+
+func (qp *QueryParams) SortQueryString(key *dynamodb.KeySchemaElement, outParams map[string]string) string {
+	var s string
+	if len(qp.Sort) != 0 {
+		s = " = :sort1"
+		outParams[":sort1"] = qp.Sort
+	} else if len(qp.SortGt) != 0 {
+		s = " > :sort1"
+		outParams[":sort1"] = qp.SortGt
+	} else if len(qp.SortGe) != 0 {
+		s = " >= :sort1"
+		outParams[":sort1"] = qp.SortGe
+	} else if len(qp.SortLt) != 0 {
+		s = " < :sort1"
+		outParams[":sort1"] = qp.SortLt
+	} else if len(qp.SortLe) != 0 {
+		s = " <= :sort1"
+		outParams[":sort1"] = qp.SortLe
+	} else if len(qp.SortBeginsWith) != 0 {
+		s = " BEGINS WITH :sort1"
+		outParams[":sort1"] = qp.SortBeginsWith
+	} else if len(qp.SortBetween) != 0 {
+		s = " BETWEEN :sort1 AND :sort2"
+		outParams[":sort1"] = qp.SortBetween[0]
+		outParams[":sort2"] = qp.SortBetween[1]
+	}
+	return aws.StringValue(key.AttributeName) + s
+}
+
+func (qp *QueryParams) isEmpty() bool {
+	return len(qp.Hash) == 0
+}
+
+func (qp *QueryParams) hasSort() bool {
+	return len(qp.Sort) != 0 || len(qp.SortGt) != 0 || len(qp.SortGe) != 0 || len(qp.SortLt) != 0 ||
+		len(qp.SortLe) != 0 || len(qp.SortBeginsWith) != 0 || len(qp.SortBetween) != 0
+}
+
+func (qp *QueryParams) KeyConditionExpression(key []*dynamodb.KeySchemaElement, outParams map[string]string) *string {
+	hashQueryString := qp.HashQueryString(key[0], outParams)
+	if qp.hasSort() {
+		return aws.String(hashQueryString + " AND " + qp.SortQueryString(key[1], outParams))
+	} else {
+		return aws.String(hashQueryString)
+	}
+}
+
+func ExportToCSV(profile string, table string, qp *QueryParams, columns string, skipColumns string, limit uint, w io.Writer) []string {
 	svc := dynamodb.New(awssessions.GetSession(profile))
 	writer := csv.NewWriter(w)
 	attributesSet := make(map[string]bool)
@@ -39,13 +101,35 @@ func ExportToCSV(profile string, table string, columns string, skipColumns strin
 			skipAttributes[attr] = true
 		}
 	}
+	var err error
+	if qp.isEmpty() {
+		err = scanPages(svc, table, columns, limit, attributes, skipAttributes, attributesSet, writer)
+	} else {
+		err = queryPages(svc, table, &QueryParams{}, columns, limit, attributes, skipAttributes, attributesSet, writer)
+	}
+	if err != nil {
+		log.Panic(err)
+	}
+	return attributes
+}
+
+func scanPages(
+	svc *dynamodb.DynamoDB,
+	table string,
+	columns string,
+	limit uint,
+	attributes []string,
+	skipAttributes map[string]bool,
+	attributesSet map[string]bool,
+	writer *csv.Writer) error {
+
+	processed := 0
+	// do not sort user defined columns
+	sorted := columns != ""
 	scan := dynamodb.ScanInput{TableName: aws.String(table)}
 	if limit > 0 {
 		scan.Limit = aws.Int64(int64(limit))
 	}
-	processed := 0
-	// do not sort user defined columns
-	sorted := columns != ""
 	err := svc.ScanPages(&scan,
 		func(page *dynamodb.ScanOutput, lastPage bool) bool {
 			for _, item := range page.Items {
@@ -87,10 +171,65 @@ func ExportToCSV(profile string, table string, columns string, skipColumns strin
 			writer.Flush()
 			return !lastPage
 		})
+	return err
+}
+
+func queryPages(svc *dynamodb.DynamoDB, table string, qp *QueryParams, columns string, limit uint, attributes []string, skipAttributes map[string]bool, attributesSet map[string]bool, writer *csv.Writer) error {
+
+	processed := 0
+	// do not sort user defined columns
+	sorted := columns != ""
+	desc, err := svc.DescribeTable(&dynamodb.DescribeTableInput{TableName: aws.String(table)})
 	if err != nil {
-		log.Panic(err)
+		log.Panicf("error fetching table %s description %v", table, err)
 	}
-	return attributes
+	outputParams := make(map[string]string)
+	query := dynamodb.QueryInput{TableName: aws.String(table), KeyConditionExpression: qp.KeyConditionExpression(desc.Table.KeySchema, outputParams)}
+	if limit > 0 {
+		query.Limit = aws.Int64(int64(limit))
+	}
+	err = svc.QueryPages(&query,
+		func(page *dynamodb.QueryOutput, lastPage bool) bool {
+			for _, item := range page.Items {
+				records := make(map[string]string)
+				for k, av := range item {
+					value, handled := getValue(av)
+					if !handled {
+						continue
+					}
+					if columns == "" {
+						if _, skip := skipAttributes[k]; !skip && !attributesSet[k] {
+							attributesSet[k] = true
+							attributes = append(attributes, k)
+						}
+					}
+					records[k] = value
+				}
+				if !sorted {
+					sort.Slice(attributes, func(i, j int) bool {
+						return attributes[i] < attributes[j]
+					})
+					sorted = true
+				}
+				orderedRecords := make([]string, 0, len(attributes))
+				for _, attr := range attributes {
+					if value, ok := records[attr]; ok {
+						orderedRecords = append(orderedRecords, value)
+					} else {
+						orderedRecords = append(orderedRecords, "")
+					}
+				}
+				_ = writer.Write(orderedRecords)
+				processed++
+				if limit > 0 && processed == int(limit) {
+					writer.Flush()
+					return false
+				}
+			}
+			writer.Flush()
+			return !lastPage
+		})
+	return err
 }
 
 func getValue(av *dynamodb.AttributeValue) (string, bool) {
