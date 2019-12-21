@@ -49,7 +49,7 @@ Use the `go` command:
     
 Or using `snap`:                                                                                                                                             
                                                                                                                                                              
-    $ snap install dynocsv                                                                                                                                   
+    $ snap install dynocsv
                                                                                                                                                              
 [![Get it from the Snap Store](https://snapcraft.io/static/images/badges/en/snap-store-black.svg)](https://snapcraft.io/dynocsv)
 
