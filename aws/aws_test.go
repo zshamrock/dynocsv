@@ -108,7 +108,7 @@ func TestGetSession(t *testing.T) {
 		session := GetSession("dynocsv")
 		// restore HOME back to its original value
 		_ = os.Setenv(homeEnvName, home)
-		for k, _ := range tt.envs {
+		for k := range tt.envs {
 			_ = os.Unsetenv(k)
 		}
 		if got := aws.StringValue(session.Config.Region); got != tt.region {

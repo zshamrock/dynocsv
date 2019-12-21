@@ -81,9 +81,8 @@ func (qp *QueryParams) KeyConditionExpression(key []*dynamodb.KeySchemaElement, 
 	hashQueryString := qp.HashQueryString(key[0], outParams)
 	if qp.hasSort() {
 		return aws.String(hashQueryString + " AND " + qp.SortQueryString(key[1], outParams))
-	} else {
-		return aws.String(hashQueryString)
 	}
+	return aws.String(hashQueryString)
 }
 
 func ExportToCSV(profile string, table string, qp *QueryParams, columns string, skipColumns string, limit uint, w io.Writer) []string {
