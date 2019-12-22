@@ -16,3 +16,6 @@ dynocsv
 vendor/
 *.lock
 *.snap
+
+# Snapcraft
+*.xdelta*
