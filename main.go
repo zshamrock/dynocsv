@@ -11,12 +11,20 @@ import (
 )
 
 const (
-	tableFlagName       = "table"
-	columnsFlagName     = "columns"
-	skipColumnsFlagName = "skip-columns"
-	limitFlagName       = "limit"
-	profileFlagName     = "profile"
-	outputFlagName      = "output"
+	tableFlagName          = "table"
+	columnsFlagName        = "columns"
+	skipColumnsFlagName    = "skip-columns"
+	limitFlagName          = "limit"
+	profileFlagName        = "profile"
+	hashFlagName           = "hash"
+	sortFlagName           = "sort"
+	sortGtFlagName         = "sort-gt"
+	sortGeFlagName         = "sort-ge"
+	sortLtFlagName         = "sort-lt"
+	sortLeFlagName         = "sort-le"
+	sortBeginsWithFlagName = "sort-begins-with"
+	sortBetweenFlagName    = "sort-between"
+	outputFlagName         = "output"
 )
 
 const appName = "dynocsv"
@@ -61,6 +69,38 @@ func main() {
 			Name: fmt.Sprintf("%s, p", profileFlagName),
 			Usage: "AWS profile to use to connect to DynamoDB, otherwise the value from AWS_PROFILE env var is used " +
 				"if available, or then \"default\" if it is not set or empty",
+		},
+		cli.StringFlag{
+			Name:  fmt.Sprintf("%s", hashFlagName),
+			Usage: "Limit query by hash value (eq/=)",
+		},
+		cli.StringFlag{
+			Name:  fmt.Sprintf("%s", sortFlagName),
+			Usage: "Limit query by sort value (eq/=)",
+		},
+		cli.StringFlag{
+			Name:  fmt.Sprintf("%s", sortGtFlagName),
+			Usage: "Limit query by sort value (gt/>)",
+		},
+		cli.StringFlag{
+			Name:  fmt.Sprintf("%s", sortGeFlagName),
+			Usage: "Limit query by sort value (ge/>=)",
+		},
+		cli.StringFlag{
+			Name:  fmt.Sprintf("%s", sortLtFlagName),
+			Usage: "Limit query by sort value (lt/<)",
+		},
+		cli.StringFlag{
+			Name:  fmt.Sprintf("%s", sortLeFlagName),
+			Usage: "Limit query by sort value (le/<=)",
+		},
+		cli.StringFlag{
+			Name:  fmt.Sprintf("%s", sortBeginsWithFlagName),
+			Usage: "Limit query by sort value (begins with)",
+		},
+		cli.StringFlag{
+			Name:  fmt.Sprintf("%s", sortBetweenFlagName),
+			Usage: "Limit query by sort value (between), values are separated by comma, i.e. \"value1,value2\"",
 		},
 		cli.StringFlag{
 			Name:  fmt.Sprintf("%s, o", outputFlagName),
