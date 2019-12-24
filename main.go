@@ -25,7 +25,19 @@ const (
 	sortBeginsWithFlagName = "sort-begins-with"
 	sortBetweenFlagName    = "sort-between"
 	outputFlagName         = "output"
+
+	sortBetweenValueSeparator = ","
 )
+
+var sortFlags = []string{
+	sortFlagName,
+	sortGtFlagName,
+	sortGeFlagName,
+	sortLtFlagName,
+	sortLeFlagName,
+	sortBeginsWithFlagName,
+	sortBetweenFlagName,
+}
 
 const appName = "dynocsv"
 
@@ -137,7 +149,41 @@ func action(c *cli.Context) error {
 	}
 	limit := c.Uint(limitFlagName)
 	profile := c.String(profileFlagName)
-	headers := dynamodb.ExportToCSV(profile, table, &dynamodb.QueryParams{}, columns, skipColumns, limit, bufio.NewWriter(file))
+	hash := c.String(hashFlagName)
+	qp := &dynamodb.QueryParams{}
+	if hash != "" {
+		sorts := make([]string, 0)
+		sort := ""
+		for _, flag := range sortFlags {
+			if c.String(flag) != "" {
+				sorts = append(sorts, flag)
+				sort = c.String(flag)
+			}
+		}
+		if len(sorts) > 1 {
+			return fmt.Errorf("only single sort condition is supported, but found %d: %v", len(sorts), sorts)
+		}
+		qp.Hash = hash
+		if len(sorts) != 0 {
+			switch sorts[0] {
+			case sortFlagName:
+				qp.Sort = sort
+			case sortGtFlagName:
+				qp.SortGt = sort
+			case sortGeFlagName:
+				qp.SortGe = sort
+			case sortLtFlagName:
+				qp.SortLt = sort
+			case sortLeFlagName:
+				qp.SortLe = sort
+			case sortBeginsWithFlagName:
+				qp.SortBeginsWith = sort
+			case sortBetweenFlagName:
+				qp.SortBetween = strings.Split(sort, sortBetweenValueSeparator)
+			}
+		}
+	}
+	headers := dynamodb.ExportToCSV(profile, table, qp, columns, skipColumns, limit, bufio.NewWriter(file))
 	if columns == "" {
 		fmt.Println(strings.Join(headers, ","))
 	}

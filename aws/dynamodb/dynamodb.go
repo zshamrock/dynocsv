@@ -88,7 +88,6 @@ func (qp *QueryParams) KeyConditionExpression(key []*dynamodb.KeySchemaElement, 
 func ExportToCSV(profile string, table string, qp *QueryParams, columns string, skipColumns string, limit uint, w io.Writer) []string {
 	svc := dynamodb.New(awssessions.GetSession(profile))
 	writer := csv.NewWriter(w)
-	attributesSet := make(map[string]bool)
 	attributes := make([]string, 0)
 	if columns != "" {
 		attributes = strings.Split(columns, columnsSeparator)
@@ -102,9 +101,9 @@ func ExportToCSV(profile string, table string, qp *QueryParams, columns string, 
 	}
 	var err error
 	if qp.isEmpty() {
-		err = scanPages(svc, table, columns, limit, attributes, skipAttributes, attributesSet, writer)
+		attributes, err = scanPages(svc, table, columns, limit, attributes, skipAttributes, writer)
 	} else {
-		err = queryPages(svc, table, &QueryParams{}, columns, limit, attributes, skipAttributes, attributesSet, writer)
+		attributes, err = queryPages(svc, table, &QueryParams{}, columns, limit, attributes, skipAttributes, writer)
 	}
 	if err != nil {
 		log.Panic(err)
@@ -119,8 +118,7 @@ func scanPages(
 	limit uint,
 	attributes []string,
 	skipAttributes map[string]bool,
-	attributesSet map[string]bool,
-	writer *csv.Writer) error {
+	writer *csv.Writer) ([]string, error) {
 
 	processed := 0
 	// do not sort user defined columns
@@ -129,6 +127,7 @@ func scanPages(
 	if limit > 0 {
 		scan.Limit = aws.Int64(int64(limit))
 	}
+	attributesSet := make(map[string]bool)
 	err := svc.ScanPages(&scan,
 		func(page *dynamodb.ScanOutput, lastPage bool) bool {
 			for _, item := range page.Items {
@@ -170,10 +169,18 @@ func scanPages(
 			writer.Flush()
 			return !lastPage
 		})
-	return err
+	return attributes, err
 }
 
-func queryPages(svc *dynamodb.DynamoDB, table string, qp *QueryParams, columns string, limit uint, attributes []string, skipAttributes map[string]bool, attributesSet map[string]bool, writer *csv.Writer) error {
+func queryPages(
+	svc *dynamodb.DynamoDB,
+	table string,
+	qp *QueryParams,
+	columns string,
+	limit uint,
+	attributes []string,
+	skipAttributes map[string]bool,
+	writer *csv.Writer) ([]string, error) {
 
 	processed := 0
 	// do not sort user defined columns
@@ -187,6 +194,7 @@ func queryPages(svc *dynamodb.DynamoDB, table string, qp *QueryParams, columns s
 	if limit > 0 {
 		query.Limit = aws.Int64(int64(limit))
 	}
+	attributesSet := make(map[string]bool)
 	err = svc.QueryPages(&query,
 		func(page *dynamodb.QueryOutput, lastPage bool) bool {
 			for _, item := range page.Items {
@@ -228,7 +236,7 @@ func queryPages(svc *dynamodb.DynamoDB, table string, qp *QueryParams, columns s
 			writer.Flush()
 			return !lastPage
 		})
-	return err
+	return attributes, err
 }
 
 func getValue(av *dynamodb.AttributeValue) (string, bool) {
