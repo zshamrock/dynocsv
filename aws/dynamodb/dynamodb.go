@@ -135,7 +135,8 @@ func findKeyByType(keys []*dynamodb.KeySchemaElement, keyType string) *dynamodb.
 
 // ExportToCSV exports the result of the scan or query from the table into the corresponding CSV file using provided
 // table and other settings.
-func ExportToCSV(profile string, table string, qp *QueryParams, columns string, skipColumns string, limit uint, w io.Writer) []string {
+func ExportToCSV(
+	profile string, table string, index string, qp *QueryParams, columns string, skipColumns string, limit uint, w io.Writer) []string {
 	svc := dynamodb.New(awssessions.GetSession(profile))
 	writer := csv.NewWriter(w)
 	attributes := make([]string, 0)
@@ -153,7 +154,7 @@ func ExportToCSV(profile string, table string, qp *QueryParams, columns string, 
 	if qp.isEmpty() {
 		attributes, err = scanPages(svc, table, columns, limit, attributes, skipAttributes, writer)
 	} else {
-		attributes, err = queryPages(svc, table, qp, columns, limit, attributes, skipAttributes, writer)
+		attributes, err = queryPages(svc, table, index, qp, columns, limit, attributes, skipAttributes, writer)
 	}
 	if err != nil {
 		log.Panic(err)
@@ -225,6 +226,7 @@ func scanPages(
 func queryPages(
 	svc *dynamodb.DynamoDB,
 	table string,
+	index string,
 	qp *QueryParams,
 	columns string,
 	limit uint,
@@ -239,12 +241,25 @@ func queryPages(
 	if err != nil {
 		log.Panicf("error fetching table %s description %v", table, err)
 	}
-	expr := qp.keyConditionExpression(desc.Table.KeySchema, desc.Table.AttributeDefinitions)
+	var keySchema = desc.Table.KeySchema
+	if index != "" {
+		indexes := desc.Table.GlobalSecondaryIndexes
+		for _, idx := range indexes {
+			if aws.StringValue(idx.IndexName) == index {
+				keySchema = idx.KeySchema
+				break
+			}
+		}
+	}
+	expr := qp.keyConditionExpression(keySchema, desc.Table.AttributeDefinitions)
 	query := dynamodb.QueryInput{
 		TableName:                 aws.String(table),
 		KeyConditionExpression:    expr.KeyCondition(),
 		ExpressionAttributeNames:  expr.Names(),
 		ExpressionAttributeValues: expr.Values()}
+	if index != "" {
+		query.IndexName = aws.String(index)
+	}
 	if limit > 0 {
 		query.Limit = aws.Int64(int64(limit))
 	}

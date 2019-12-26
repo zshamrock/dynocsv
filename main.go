@@ -12,6 +12,7 @@ import (
 
 const (
 	tableFlagName          = "table"
+	indexFlagName          = "index"
 	columnsFlagName        = "columns"
 	skipColumnsFlagName    = "skip-columns"
 	limitFlagName          = "limit"
@@ -63,6 +64,10 @@ func main() {
 		cli.StringFlag{
 			Name:  fmt.Sprintf("%s, t", tableFlagName),
 			Usage: "table to export",
+		},
+		cli.StringFlag{
+			Name:  fmt.Sprintf("%s, i", indexFlagName),
+			Usage: "index to query if hash/sort are set instead of table (which is default)",
 		},
 		cli.StringFlag{
 			Name: fmt.Sprintf("%s, c", columnsFlagName),
@@ -184,7 +189,8 @@ func action(c *cli.Context) error {
 			}
 		}
 	}
-	headers := dynamodb.ExportToCSV(profile, table, qp, columns, skipColumns, limit, bufio.NewWriter(file))
+	headers := dynamodb.ExportToCSV(
+		profile, table, c.String(indexFlagName), qp, columns, skipColumns, limit, bufio.NewWriter(file))
 	if columns == "" {
 		fmt.Println(strings.Join(headers, ","))
 	}
