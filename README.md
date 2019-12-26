@@ -97,6 +97,8 @@ By default `Scan` operation is run to fetch all the data, if `--hash` and any of
 `Query` operation will be run to query the corresponding data based on the key conditions specified by `--hash` and
 `--sort` values. 
 
+Query can be run either on the table (default) or index (if `--index` argument is set).
+
 ## Limits
 
 Currently there are the following limitations:
