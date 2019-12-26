@@ -46,19 +46,20 @@ func main() {
 	app := cli.NewApp()
 	app.Name = appName
 	app.Usage = `Export DynamoDB table into CSV file`
-	app.Version = "1.1.0"
+	app.Version = "1.1.1"
 	app.Author = "(c) Aliaksandr Kazlou"
 	app.Metadata = map[string]interface{}{"GitHub": "https://github.com/zshamrock/dynocsv"}
 	app.UsageText = fmt.Sprintf(`%s		 
-		--table/-t                                     <table> 
-		[--columns/-c                                  <comma separated columns>] 
-		[--skip-columns/-sc                            <comma separated columns to skip>] 
-		[--limit/-l                                    <number>]
-		[--profile/-p                                  <AWS profile>]
-		[--hash                                        <hash value>]
-		[--sort                                        <sort value>]
-		[--sort-[gt, ge, lt, le, begins-with, between] <sort value>]
-		[--output/-o                                   <output file name>]`,
+        --table/-t                                     <table> 
+        [--columns/-c                                  <comma separated columns>] 
+        [--skip-columns/-sc                            <comma separated columns to skip>] 
+        [--limit/-l                                    <number>]
+        [--profile/-p                                  <AWS profile>]
+        [--index/-i                                    <index to query instead of table>]
+        [--hash                                        <hash value>]
+        [--sort                                        <sort value>]
+        [--sort-[gt, ge, lt, le, begins-with, between] <sort value>]
+        [--output/-o                                   <output file name>]`,
 		appName)
 	app.Flags = []cli.Flag{
 		cli.StringFlag{

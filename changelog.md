@@ -1,6 +1,6 @@
-# [1.0.0] - 2019-10-25
+# [1.1.1] - 2019-12-27
 ## Added
-- Initial release
+- Support to query on index if specified rather than on table
 
 ## Changed
 
@@ -13,4 +13,14 @@
 ## Changed
 
 ## Removed
+
+# [1.0.0] - 2019-10-25
+## Added
+- Initial release
+
+## Changed
+
+## Removed
+
+
 

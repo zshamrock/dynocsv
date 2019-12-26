@@ -8,18 +8,19 @@ NAME:
 
 USAGE:
    dynocsv     
-              --table/-t                                     <table> 
-              [--columns/-c                                  <comma separated columns>] 
-              [--skip-columns/-sc                            <comma separated columns to skip>] 
-              [--limit/-l                                    <number>]
-              [--profile/-p                                  <AWS profile>]
-              [--hash                                        <hash value>]
-              [--sort                                        <sort value>]
-              [--sort-[gt, ge, lt, le, begins-with, between] <sort value>]
-              [--output/-o                                   <output file name>]
+        --table/-t                                     <table> 
+        [--columns/-c                                  <comma separated columns>] 
+        [--skip-columns/-sc                            <comma separated columns to skip>] 
+        [--limit/-l                                    <number>]
+        [--profile/-p                                  <AWS profile>]
+        [--index/-i                                    <index to query instead of table>]
+        [--hash                                        <hash value>]
+        [--sort                                        <sort value>]
+        [--sort-[gt, ge, lt, le, begins-with, between] <sort value>]
+        [--output/-o                                   <output file name>]
 
 VERSION:
-   1.1.0
+   1.1.1
 
 AUTHOR:
    (c) Aliaksandr Kazlou
@@ -29,6 +30,7 @@ COMMANDS:
 
 GLOBAL OPTIONS:
    --table value, -t value           table to export
+   --index value, -i value           index to query if hash/sort are set instead of table (which is default)
    --columns value, -c value         columns to export from the table, if omitted, all columns will be exported (muttaly exclusive with "skip-columns")
    --skip-columns value, --sc value  columns skipped from export from the table, if omitted, all columns will be exported (muttaly exclusive with "columns")
    --limit value, -l value           limit number of records returned, if not set (i.e. 0) all items are fetched (default: 0)
