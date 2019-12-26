@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
 	awssessions "github.com/zshamrock/dynocsv/aws"
 	"io"
 	"log"
@@ -24,6 +25,7 @@ const (
 	listCloseSymbol     = "]"
 )
 
+// QueryParams represents the query params set by the user, either hash or hash and sort.
 type QueryParams struct {
 	Hash           string
 	Sort           string
@@ -35,37 +37,56 @@ type QueryParams struct {
 	SortBetween    []string
 }
 
-func (qp *QueryParams) HashQueryString(key *dynamodb.KeySchemaElement, outParams map[string]string) string {
-	outParams[":hash1"] = qp.Hash
-	return aws.StringValue(key.AttributeName) + " = :hash1"
+func (qp *QueryParams) hashKeyConditionBuilder(
+	key *dynamodb.KeySchemaElement, definitions map[string]string) expression.KeyConditionBuilder {
+	attributeName := aws.StringValue(key.AttributeName)
+	return expression.KeyEqual(
+		expression.Key(attributeName),
+		expression.Value(parse(qp.Hash, definitions[attributeName])))
 }
 
-func (qp *QueryParams) SortQueryString(key *dynamodb.KeySchemaElement, outParams map[string]string) string {
-	var s string
+func (qp *QueryParams) sortKeyConditionBuilder(
+	key *dynamodb.KeySchemaElement, definitions map[string]string) expression.KeyConditionBuilder {
+	attributeName := aws.StringValue(key.AttributeName)
+	kb := expression.Key(attributeName)
+	attributeType := definitions[attributeName]
 	if len(qp.Sort) != 0 {
-		s = " = :sort1"
-		outParams[":sort1"] = qp.Sort
+		return expression.KeyEqual(kb, expression.Value(parse(qp.Sort, attributeType)))
 	} else if len(qp.SortGt) != 0 {
-		s = " > :sort1"
-		outParams[":sort1"] = qp.SortGt
+		return expression.KeyGreaterThan(kb, expression.Value(parse(qp.SortGt, attributeType)))
 	} else if len(qp.SortGe) != 0 {
-		s = " >= :sort1"
-		outParams[":sort1"] = qp.SortGe
+		return expression.KeyGreaterThanEqual(kb, expression.Value(parse(qp.SortGe, attributeType)))
 	} else if len(qp.SortLt) != 0 {
-		s = " < :sort1"
-		outParams[":sort1"] = qp.SortLt
+		return expression.KeyLessThan(kb, expression.Value(parse(qp.SortLt, attributeType)))
 	} else if len(qp.SortLe) != 0 {
-		s = " <= :sort1"
-		outParams[":sort1"] = qp.SortLe
+		return expression.KeyLessThanEqual(kb, expression.Value(parse(qp.SortLe, attributeType)))
 	} else if len(qp.SortBeginsWith) != 0 {
-		s = " BEGINS WITH :sort1"
-		outParams[":sort1"] = qp.SortBeginsWith
+		return expression.KeyBeginsWith(kb, qp.SortBeginsWith)
 	} else if len(qp.SortBetween) != 0 {
-		s = " BETWEEN :sort1 AND :sort2"
-		outParams[":sort1"] = qp.SortBetween[0]
-		outParams[":sort2"] = qp.SortBetween[1]
+		return expression.KeyBetween(
+			kb,
+			expression.Value(parse(qp.SortBetween[0], attributeType)),
+			expression.Value(parse(qp.SortBetween[1], attributeType)))
 	}
-	return aws.StringValue(key.AttributeName) + s
+	log.Panic("unsupported sort key operation")
+	return expression.KeyConditionBuilder{}
+}
+
+func parse(attributeValue string, attributeType string) interface{} {
+	var err error = nil
+	var value interface{} = ""
+	switch attributeType {
+	case dynamodb.ScalarAttributeTypeS:
+		value = attributeValue
+	case dynamodb.ScalarAttributeTypeN:
+		value, err = strconv.ParseInt(attributeValue, 10, 64)
+	case dynamodb.ScalarAttributeTypeB:
+		value, err = strconv.ParseBool(attributeValue)
+	}
+	if err != nil {
+		log.Panicf("failed to parse %s into the corresponding type %s: %v", value, attributeType, err)
+	}
+	return value
 }
 
 func (qp *QueryParams) isEmpty() bool {
@@ -77,14 +98,43 @@ func (qp *QueryParams) hasSort() bool {
 		len(qp.SortLe) != 0 || len(qp.SortBeginsWith) != 0 || len(qp.SortBetween) != 0
 }
 
-func (qp *QueryParams) KeyConditionExpression(key []*dynamodb.KeySchemaElement, outParams map[string]string) *string {
-	hashQueryString := qp.HashQueryString(key[0], outParams)
-	if qp.hasSort() {
-		return aws.String(hashQueryString + " AND " + qp.SortQueryString(key[1], outParams))
+func (qp *QueryParams) keyConditionExpression(
+	keys []*dynamodb.KeySchemaElement, definitions []*dynamodb.AttributeDefinition) expression.Expression {
+	definitionsMapping := make(map[string]string)
+	for _, definition := range definitions {
+		definitionsMapping[aws.StringValue(definition.AttributeName)] = aws.StringValue(definition.AttributeType)
 	}
-	return aws.String(hashQueryString)
+	hashKeyConditionBuilder := qp.hashKeyConditionBuilder(findHashKey(keys), definitionsMapping)
+	keyConditionBuilder := hashKeyConditionBuilder
+	if qp.hasSort() {
+		keyConditionBuilder = hashKeyConditionBuilder.And(qp.sortKeyConditionBuilder(findRangeKey(keys), definitionsMapping))
+	}
+	expr, err := expression.NewBuilder().WithKeyCondition(keyConditionBuilder).Build()
+	if err != nil {
+		log.Panicf("failed to build query expression due to %v", err)
+	}
+	return expr
 }
 
+func findHashKey(keys []*dynamodb.KeySchemaElement) *dynamodb.KeySchemaElement {
+	return findKeyByType(keys, dynamodb.KeyTypeHash)
+}
+
+func findRangeKey(keys []*dynamodb.KeySchemaElement) *dynamodb.KeySchemaElement {
+	return findKeyByType(keys, dynamodb.KeyTypeRange)
+}
+
+func findKeyByType(keys []*dynamodb.KeySchemaElement, keyType string) *dynamodb.KeySchemaElement {
+	for _, key := range keys {
+		if aws.StringValue(key.KeyType) == keyType {
+			return key
+		}
+	}
+	return nil
+}
+
+// ExportToCSV exports the result of the scan or query from the table into the corresponding CSV file using provided
+// table and other settings.
 func ExportToCSV(profile string, table string, qp *QueryParams, columns string, skipColumns string, limit uint, w io.Writer) []string {
 	svc := dynamodb.New(awssessions.GetSession(profile))
 	writer := csv.NewWriter(w)
@@ -103,7 +153,7 @@ func ExportToCSV(profile string, table string, qp *QueryParams, columns string, 
 	if qp.isEmpty() {
 		attributes, err = scanPages(svc, table, columns, limit, attributes, skipAttributes, writer)
 	} else {
-		attributes, err = queryPages(svc, table, &QueryParams{}, columns, limit, attributes, skipAttributes, writer)
+		attributes, err = queryPages(svc, table, qp, columns, limit, attributes, skipAttributes, writer)
 	}
 	if err != nil {
 		log.Panic(err)
@@ -189,8 +239,12 @@ func queryPages(
 	if err != nil {
 		log.Panicf("error fetching table %s description %v", table, err)
 	}
-	outputParams := make(map[string]string)
-	query := dynamodb.QueryInput{TableName: aws.String(table), KeyConditionExpression: qp.KeyConditionExpression(desc.Table.KeySchema, outputParams)}
+	expr := qp.keyConditionExpression(desc.Table.KeySchema, desc.Table.AttributeDefinitions)
+	query := dynamodb.QueryInput{
+		TableName:                 aws.String(table),
+		KeyConditionExpression:    expr.KeyCondition(),
+		ExpressionAttributeNames:  expr.Names(),
+		ExpressionAttributeValues: expr.Values()}
 	if limit > 0 {
 		query.Limit = aws.Int64(int64(limit))
 	}

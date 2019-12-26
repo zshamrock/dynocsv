@@ -24,6 +24,7 @@ const (
 	homeEnvName         = "HOME"
 )
 
+// GetSession returns the AWS session for the corresponding profile.
 func GetSession(profile string) *session.Session {
 	p := profile
 	if profile == "" {

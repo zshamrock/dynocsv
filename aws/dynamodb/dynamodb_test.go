@@ -3,6 +3,7 @@ package dynamodb
 import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
 	"reflect"
 	"testing"
 )
@@ -363,7 +364,7 @@ func TestQueryParamsIsEmpty(t *testing.T) {
 	}
 }
 
-func TestQueryParamsHashQueryString(t *testing.T) {
+func TestQueryParamsHashKeyConditionBuilder(t *testing.T) {
 	type fields struct {
 		Hash           string
 		Sort           string
@@ -375,24 +376,33 @@ func TestQueryParamsHashQueryString(t *testing.T) {
 		SortBetween    []string
 	}
 	type args struct {
-		key       *dynamodb.KeySchemaElement
-		outParams map[string]string
+		key         *dynamodb.KeySchemaElement
+		definitions map[string]string
 	}
 	tests := []struct {
-		name          string
-		fields        fields
-		args          args
-		want          string
-		outParamsWant map[string]string
+		name   string
+		fields fields
+		args   args
+		want   expression.KeyConditionBuilder
 	}{
-		{name: "hash",
+		{
+			name:   "hash/S",
 			fields: fields{Hash: "value1"},
 			args: args{key: &dynamodb.KeySchemaElement{
 				AttributeName: aws.String("Attribute1"),
 				KeyType:       aws.String(dynamodb.KeyTypeHash)},
-				outParams: make(map[string]string)},
-			want:          "Attribute1 = :hash1",
-			outParamsWant: map[string]string{":hash1": "value1"}},
+				definitions: map[string]string{"Attribute1": dynamodb.ScalarAttributeTypeS}},
+			want: expression.KeyEqual(expression.Key("Attribute1"), expression.Value("value1")),
+		},
+		{
+			name:   "hash/N",
+			fields: fields{Hash: "1529665668588"},
+			args: args{key: &dynamodb.KeySchemaElement{
+				AttributeName: aws.String("Attribute1"),
+				KeyType:       aws.String(dynamodb.KeyTypeHash)},
+				definitions: map[string]string{"Attribute1": dynamodb.ScalarAttributeTypeN}},
+			want: expression.KeyEqual(expression.Key("Attribute1"), expression.Value(int64(1529665668588))),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -406,11 +416,8 @@ func TestQueryParamsHashQueryString(t *testing.T) {
 				SortBeginsWith: tt.fields.SortBeginsWith,
 				SortBetween:    tt.fields.SortBetween,
 			}
-			if got := qp.HashQueryString(tt.args.key, tt.args.outParams); got != tt.want {
-				t.Errorf("HashQueryString() = %v, want %v", got, tt.want)
-			}
-			if !reflect.DeepEqual(tt.args.outParams, tt.outParamsWant) {
-				t.Errorf("HashQueryString out params don't match() = %v, want %v", tt.args.outParams, tt.outParamsWant)
+			if cond := qp.hashKeyConditionBuilder(tt.args.key, tt.args.definitions); !reflect.DeepEqual(cond, tt.want) {
+				t.Errorf("hashKeyConditionBuilder() = %v, want %v", cond, tt.want)
 			}
 		})
 	}
@@ -428,72 +435,133 @@ func TestQueryParamsSortQueryString(t *testing.T) {
 		SortBetween    []string
 	}
 	type args struct {
-		key       *dynamodb.KeySchemaElement
-		outParams map[string]string
+		key         *dynamodb.KeySchemaElement
+		definitions map[string]string
 	}
 	tests := []struct {
-		name          string
-		fields        fields
-		args          args
-		want          string
-		outParamsWant map[string]string
+		name   string
+		fields fields
+		args   args
+		want   expression.KeyConditionBuilder
 	}{
-		{name: "sort",
+		{
+			name:   "sort/S",
 			fields: fields{Hash: "value1", Sort: "value2"},
 			args: args{key: &dynamodb.KeySchemaElement{
 				AttributeName: aws.String("Attribute2"),
 				KeyType:       aws.String(dynamodb.KeyTypeRange)},
-				outParams: make(map[string]string)},
-			want:          "Attribute2 = :sort1",
-			outParamsWant: map[string]string{":sort1": "value2"}},
-		{name: "sort gt",
+				definitions: map[string]string{"Attribute2": dynamodb.ScalarAttributeTypeS}},
+			want: expression.KeyEqual(expression.Key("Attribute2"), expression.Value("value2")),
+		},
+		{
+			name:   "sort gt/S",
 			fields: fields{Hash: "value1", SortGt: "value2"},
 			args: args{key: &dynamodb.KeySchemaElement{
 				AttributeName: aws.String("Attribute2"),
 				KeyType:       aws.String(dynamodb.KeyTypeRange)},
-				outParams: make(map[string]string)},
-			want:          "Attribute2 > :sort1",
-			outParamsWant: map[string]string{":sort1": "value2"}},
-		{name: "sort ge",
+				definitions: map[string]string{"Attribute2": dynamodb.ScalarAttributeTypeS}},
+			want: expression.KeyGreaterThan(expression.Key("Attribute2"), expression.Value("value2")),
+		},
+		{
+			name:   "sort ge/S",
 			fields: fields{Hash: "value1", SortGe: "value2"},
 			args: args{key: &dynamodb.KeySchemaElement{
 				AttributeName: aws.String("Attribute2"),
 				KeyType:       aws.String(dynamodb.KeyTypeRange)},
-				outParams: make(map[string]string)},
-			want:          "Attribute2 >= :sort1",
-			outParamsWant: map[string]string{":sort1": "value2"}},
-		{name: "sort lt",
+				definitions: map[string]string{"Attribute2": dynamodb.ScalarAttributeTypeS}},
+			want: expression.KeyGreaterThanEqual(expression.Key("Attribute2"), expression.Value("value2")),
+		},
+		{
+			name:   "sort lt/S",
 			fields: fields{Hash: "value1", SortLt: "value2"},
 			args: args{key: &dynamodb.KeySchemaElement{
 				AttributeName: aws.String("Attribute2"),
 				KeyType:       aws.String(dynamodb.KeyTypeRange)},
-				outParams: make(map[string]string)},
-			want:          "Attribute2 < :sort1",
-			outParamsWant: map[string]string{":sort1": "value2"}},
-		{name: "sort le",
+				definitions: map[string]string{"Attribute2": dynamodb.ScalarAttributeTypeS}},
+			want: expression.KeyLessThan(expression.Key("Attribute2"), expression.Value("value2")),
+		},
+		{
+			name:   "sort le/S",
 			fields: fields{Hash: "value1", SortLe: "value2"},
 			args: args{key: &dynamodb.KeySchemaElement{
 				AttributeName: aws.String("Attribute2"),
 				KeyType:       aws.String(dynamodb.KeyTypeRange)},
-				outParams: make(map[string]string)},
-			want:          "Attribute2 <= :sort1",
-			outParamsWant: map[string]string{":sort1": "value2"}},
-		{name: "sort begins with",
+				definitions: map[string]string{"Attribute2": dynamodb.ScalarAttributeTypeS}},
+			want: expression.KeyLessThanEqual(expression.Key("Attribute2"), expression.Value("value2")),
+		},
+		{
+			name:   "sort begins with/S",
 			fields: fields{Hash: "value1", SortBeginsWith: "value2"},
 			args: args{key: &dynamodb.KeySchemaElement{
 				AttributeName: aws.String("Attribute2"),
 				KeyType:       aws.String(dynamodb.KeyTypeRange)},
-				outParams: make(map[string]string)},
-			want:          "Attribute2 BEGINS WITH :sort1",
-			outParamsWant: map[string]string{":sort1": "value2"}},
-		{name: "sort between",
+				definitions: map[string]string{"Attribute2": dynamodb.ScalarAttributeTypeS}},
+			want: expression.KeyBeginsWith(expression.Key("Attribute2"), "value2"),
+		},
+		{
+			name:   "sort between/S",
 			fields: fields{Hash: "value1", SortBetween: []string{"value2", "value3"}},
 			args: args{key: &dynamodb.KeySchemaElement{
 				AttributeName: aws.String("Attribute2"),
 				KeyType:       aws.String(dynamodb.KeyTypeRange)},
-				outParams: make(map[string]string)},
-			want:          "Attribute2 BETWEEN :sort1 AND :sort2",
-			outParamsWant: map[string]string{":sort1": "value2", ":sort2": "value3"}},
+				definitions: map[string]string{"Attribute2": dynamodb.ScalarAttributeTypeS}},
+			want: expression.KeyBetween(expression.Key("Attribute2"), expression.Value("value2"), expression.Value("value3")),
+		},
+
+		{
+			name:   "sort/N",
+			fields: fields{Hash: "value1", Sort: "1529665668588"},
+			args: args{key: &dynamodb.KeySchemaElement{
+				AttributeName: aws.String("Attribute2"),
+				KeyType:       aws.String(dynamodb.KeyTypeRange)},
+				definitions: map[string]string{"Attribute2": dynamodb.ScalarAttributeTypeN}},
+			want: expression.KeyEqual(expression.Key("Attribute2"), expression.Value(int64(1529665668588))),
+		},
+		{
+			name:   "sort gt/N",
+			fields: fields{Hash: "value1", SortGt: "1529665668588"},
+			args: args{key: &dynamodb.KeySchemaElement{
+				AttributeName: aws.String("Attribute2"),
+				KeyType:       aws.String(dynamodb.KeyTypeRange)},
+				definitions: map[string]string{"Attribute2": dynamodb.ScalarAttributeTypeN}},
+			want: expression.KeyGreaterThan(expression.Key("Attribute2"), expression.Value(int64(1529665668588))),
+		},
+		{
+			name:   "sort ge/N",
+			fields: fields{Hash: "value1", SortGe: "1529665668588"},
+			args: args{key: &dynamodb.KeySchemaElement{
+				AttributeName: aws.String("Attribute2"),
+				KeyType:       aws.String(dynamodb.KeyTypeRange)},
+				definitions: map[string]string{"Attribute2": dynamodb.ScalarAttributeTypeN}},
+			want: expression.KeyGreaterThanEqual(expression.Key("Attribute2"), expression.Value(int64(1529665668588))),
+		},
+		{
+			name:   "sort lt/N",
+			fields: fields{Hash: "value1", SortLt: "1529665668588"},
+			args: args{key: &dynamodb.KeySchemaElement{
+				AttributeName: aws.String("Attribute2"),
+				KeyType:       aws.String(dynamodb.KeyTypeRange)},
+				definitions: map[string]string{"Attribute2": dynamodb.ScalarAttributeTypeN}},
+			want: expression.KeyLessThan(expression.Key("Attribute2"), expression.Value(int64(1529665668588))),
+		},
+		{
+			name:   "sort le/N",
+			fields: fields{Hash: "value1", SortLe: "1529665668588"},
+			args: args{key: &dynamodb.KeySchemaElement{
+				AttributeName: aws.String("Attribute2"),
+				KeyType:       aws.String(dynamodb.KeyTypeRange)},
+				definitions: map[string]string{"Attribute2": dynamodb.ScalarAttributeTypeN}},
+			want: expression.KeyLessThanEqual(expression.Key("Attribute2"), expression.Value(int64(1529665668588))),
+		},
+		{
+			name:   "sort between/N",
+			fields: fields{Hash: "value1", SortBetween: []string{"1529665592540", "1529665668588"}},
+			args: args{key: &dynamodb.KeySchemaElement{
+				AttributeName: aws.String("Attribute2"),
+				KeyType:       aws.String(dynamodb.KeyTypeRange)},
+				definitions: map[string]string{"Attribute2": dynamodb.ScalarAttributeTypeN}},
+			want: expression.KeyBetween(expression.Key("Attribute2"), expression.Value(int64(1529665592540)), expression.Value(int64(1529665668588))),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -507,11 +575,8 @@ func TestQueryParamsSortQueryString(t *testing.T) {
 				SortBeginsWith: tt.fields.SortBeginsWith,
 				SortBetween:    tt.fields.SortBetween,
 			}
-			if got := qp.SortQueryString(tt.args.key, tt.args.outParams); got != tt.want {
-				t.Errorf("SortQueryString() = %v, want %v", got, tt.want)
-			}
-			if !reflect.DeepEqual(tt.args.outParams, tt.outParamsWant) {
-				t.Errorf("SortQueryString out params don't match() = %v, want %v", tt.args.outParams, tt.outParamsWant)
+			if cond := qp.sortKeyConditionBuilder(tt.args.key, tt.args.definitions); !reflect.DeepEqual(cond, tt.want) {
+				t.Errorf("sortKeyConditionBuilder() = %v, want %v", cond, tt.want)
 			}
 		})
 	}
@@ -529,25 +594,43 @@ func TestQueryParamsKeyConditionExpression(t *testing.T) {
 		SortBetween    []string
 	}
 	type args struct {
-		key       []*dynamodb.KeySchemaElement
-		outParams map[string]string
+		key         []*dynamodb.KeySchemaElement
+		definitions []*dynamodb.AttributeDefinition
+	}
+	createExpression := func(cond expression.KeyConditionBuilder) expression.Expression {
+		expr, _ := expression.NewBuilder().WithKeyCondition(cond).Build()
+		return expr
 	}
 	tests := []struct {
-		name          string
-		fields        fields
-		args          args
-		want          *string
-		outParamsWant map[string]string
+		name   string
+		fields fields
+		args   args
+		want   expression.Expression
 	}{
-		{name: "hash",
+		{
+			name:   "hash/S",
 			fields: fields{Hash: "value1"},
 			args: args{key: []*dynamodb.KeySchemaElement{{
 				AttributeName: aws.String("Attribute1"),
 				KeyType:       aws.String(dynamodb.KeyTypeHash)}},
-				outParams: make(map[string]string)},
-			want:          aws.String("Attribute1 = :hash1"),
-			outParamsWant: map[string]string{":hash1": "value1"}},
-		{name: "hash and sort",
+				definitions: []*dynamodb.AttributeDefinition{
+					{AttributeName: aws.String("Attribute1"), AttributeType: aws.String(dynamodb.ScalarAttributeTypeS)},
+				}},
+			want: createExpression(expression.KeyEqual(expression.Key("Attribute1"), expression.Value("value1"))),
+		},
+		{
+			name:   "hash/N",
+			fields: fields{Hash: "1529665668588"},
+			args: args{key: []*dynamodb.KeySchemaElement{{
+				AttributeName: aws.String("Attribute1"),
+				KeyType:       aws.String(dynamodb.KeyTypeHash)}},
+				definitions: []*dynamodb.AttributeDefinition{
+					{AttributeName: aws.String("Attribute1"), AttributeType: aws.String(dynamodb.ScalarAttributeTypeN)},
+				}},
+			want: createExpression(expression.KeyEqual(expression.Key("Attribute1"), expression.Value(int64(1529665668588)))),
+		},
+		{
+			name:   "hash/S and sort/S",
 			fields: fields{Hash: "value1", Sort: "value2"},
 			args: args{key: []*dynamodb.KeySchemaElement{
 				{
@@ -556,11 +639,17 @@ func TestQueryParamsKeyConditionExpression(t *testing.T) {
 				{
 					AttributeName: aws.String("Attribute2"),
 					KeyType:       aws.String(dynamodb.KeyTypeRange)}},
-				outParams: make(map[string]string)},
-			want:          aws.String("Attribute1 = :hash1 AND Attribute2 = :sort1"),
-			outParamsWant: map[string]string{":hash1": "value1", ":sort1": "value2"}},
-		{name: "hash and sort between",
-			fields: fields{Hash: "value1", SortBetween: []string{"value2", "value3"}},
+				definitions: []*dynamodb.AttributeDefinition{
+					{AttributeName: aws.String("Attribute1"), AttributeType: aws.String(dynamodb.ScalarAttributeTypeS)},
+					{AttributeName: aws.String("Attribute2"), AttributeType: aws.String(dynamodb.ScalarAttributeTypeS)},
+				}},
+			want: createExpression(
+				expression.KeyEqual(expression.Key("Attribute1"), expression.Value("value1")).And(
+					expression.KeyEqual(expression.Key("Attribute2"), expression.Value("value2")))),
+		},
+		{
+			name:   "hash/N and sort/N",
+			fields: fields{Hash: "1529665592540", Sort: "1529665668588"},
 			args: args{key: []*dynamodb.KeySchemaElement{
 				{
 					AttributeName: aws.String("Attribute1"),
@@ -568,9 +657,33 @@ func TestQueryParamsKeyConditionExpression(t *testing.T) {
 				{
 					AttributeName: aws.String("Attribute2"),
 					KeyType:       aws.String(dynamodb.KeyTypeRange)}},
-				outParams: make(map[string]string)},
-			want:          aws.String("Attribute1 = :hash1 AND Attribute2 BETWEEN :sort1 AND :sort2"),
-			outParamsWant: map[string]string{":hash1": "value1", ":sort1": "value2", ":sort2": "value3"}},
+				definitions: []*dynamodb.AttributeDefinition{
+					{AttributeName: aws.String("Attribute1"), AttributeType: aws.String(dynamodb.ScalarAttributeTypeN)},
+					{AttributeName: aws.String("Attribute2"), AttributeType: aws.String(dynamodb.ScalarAttributeTypeN)},
+				}},
+			want: createExpression(
+				expression.KeyEqual(expression.Key("Attribute1"), expression.Value(int64(1529665592540))).And(
+					expression.KeyEqual(expression.Key("Attribute2"), expression.Value(int64(1529665668588))))),
+		},
+		{
+			name:   "hash/S and sort between/N",
+			fields: fields{Hash: "value1", SortBetween: []string{"1529665592540", "1529665668588"}},
+			args: args{key: []*dynamodb.KeySchemaElement{
+				{
+					AttributeName: aws.String("Attribute1"),
+					KeyType:       aws.String(dynamodb.KeyTypeHash)},
+				{
+					AttributeName: aws.String("Attribute2"),
+					KeyType:       aws.String(dynamodb.KeyTypeRange)}},
+				definitions: []*dynamodb.AttributeDefinition{
+					{AttributeName: aws.String("Attribute1"), AttributeType: aws.String(dynamodb.ScalarAttributeTypeS)},
+					{AttributeName: aws.String("Attribute2"), AttributeType: aws.String(dynamodb.ScalarAttributeTypeN)},
+				}},
+			want: createExpression(
+				expression.KeyEqual(expression.Key("Attribute1"), expression.Value("value1")).And(
+					expression.KeyBetween(expression.Key("Attribute2"),
+						expression.Value(int64(1529665592540)), expression.Value(int64(1529665668588))))),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -584,11 +697,12 @@ func TestQueryParamsKeyConditionExpression(t *testing.T) {
 				SortBeginsWith: tt.fields.SortBeginsWith,
 				SortBetween:    tt.fields.SortBetween,
 			}
-			if got := qp.KeyConditionExpression(tt.args.key, tt.args.outParams); aws.StringValue(got) != aws.StringValue(tt.want) {
-				t.Errorf("KeyConditionExpression() = %v, want %v", aws.StringValue(got), aws.StringValue(tt.want))
-			}
-			if !reflect.DeepEqual(tt.args.outParams, tt.outParamsWant) {
-				t.Errorf("KeyConditionExpression out params don't match() = %v, want %v", tt.args.outParams, tt.outParamsWant)
+			if expr := qp.keyConditionExpression(tt.args.key, tt.args.definitions); aws.StringValue(expr.KeyCondition()) != aws.StringValue(tt.want.KeyCondition()) &&
+				!reflect.DeepEqual(expr.Values(), tt.want.Values()) &&
+				!reflect.DeepEqual(expr.Names(), tt.want.Names()) {
+				t.Errorf("keyConditionExpression() = %v, %v, %v, want %v, %v, %v",
+					aws.StringValue(expr.KeyCondition()), expr.Values(), expr.Names(),
+					aws.StringValue(tt.want.KeyCondition()), tt.want.Values(), tt.want.Names())
 			}
 		})
 	}
