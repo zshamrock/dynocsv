@@ -52,6 +52,7 @@ Table of Contents
 * [Installation](#installation)
 * [Usage](#usage)
 * [AWS Connection](#aws-connection)
+* [Query](#query)
 * [Limits](#limits)
 
 ## Installation                                                                                                                                              
@@ -87,6 +88,12 @@ Connection to the AWS is established using profile credentials. There are 2 opti
 2. set the env var `$AWS_PROFILE` before running the app, i.e. `AWS_PROFILE=<profile name> dynocsv -t <table name>`
 
 If no explicit profile value is set, it looks for the env var `$AWS_PROFILE` if present or otherwise fallbacks to the `default` profile.
+
+## Query
+
+By default `Scan` operation is run to fetch all the data, if `--hash` and any of the `--sort` CLI arguments are provided,
+`Query` operation will be run to query the corresponding data based on the key conditions specified by `--hash` and
+`--sort` values. 
 
 ## Limits
 
