@@ -7,15 +7,19 @@ NAME:
    dynocsv - Export DynamoDB table into CSV file
 
 USAGE:
-   dynocsv
-              --table/-t <table>
-              [--columns/-c <comma separated columns>]
-              [--limit/-l <number>]
-              [--profile/-p <AWS profile>]
-              [--output/-o <output file name>]
+   dynocsv     
+              --table/-t                                     <table> 
+              [--columns/-c                                  <comma separated columns>] 
+              [--skip-columns/-sc                            <comma separated columns to skip>] 
+              [--limit/-l                                    <number>]
+              [--profile/-p                                  <AWS profile>]
+              [--hash                                        <hash value>]
+              [--sort                                        <sort value>]
+              [--sort-[gt, ge, lt, le, begins-with, between] <sort value>]
+              [--output/-o                                   <output file name>]
 
 VERSION:
-   1.0.0
+   1.1.0
 
 AUTHOR:
    (c) Aliaksandr Kazlou
@@ -24,13 +28,22 @@ COMMANDS:
      help, h  Shows a list of commands or help for one command
 
 GLOBAL OPTIONS:
-   --table value, -t value    table to export
-   --columns value, -c value  optional columns to export from the table, if skipped, all columns will be exported
-   --limit value, -l value    limit number of records returned, if not set (i.e. 0) all items are fetched (default: 0)
-   --profile value, -p value  AWS profile to use to connect to DynamoDB, otherwise the value from AWS_PROFILE env var is used if available, or then "default" if it is not set or empty
-   --output value, -o value   output file, or the default <table name>.csv will be used
-   --help, -h                 show help
-   --version, -v              print the version
+   --table value, -t value           table to export
+   --columns value, -c value         columns to export from the table, if omitted, all columns will be exported (muttaly exclusive with "skip-columns")
+   --skip-columns value, --sc value  columns skipped from export from the table, if omitted, all columns will be exported (muttaly exclusive with "columns")
+   --limit value, -l value           limit number of records returned, if not set (i.e. 0) all items are fetched (default: 0)
+   --profile value, -p value         AWS profile to use to connect to DynamoDB, otherwise the value from AWS_PROFILE env var is used if available, or then "default" if it is not set or empty
+   --hash value                      Limit query by hash value (eq/=)
+   --sort value                      Limit query by sort value (eq/=)
+   --sort-gt value                   Limit query by sort value (gt/>)
+   --sort-ge value                   Limit query by sort value (ge/>=)
+   --sort-lt value                   Limit query by sort value (lt/<)
+   --sort-le value                   Limit query by sort value (le/<=)
+   --sort-begins-with value          Limit query by sort value (begins with)
+   --sort-between value              Limit query by sort value (between), values are separated by comma, i.e. "value1,value2"
+   --output value, -o value          output file, or the default <table name>.csv will be used
+   --help, -h                        show help
+   --version, -v                     print the version
 ```
 
 Table of Contents
