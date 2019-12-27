@@ -1,7 +1,7 @@
 # [1.1.2] - 2019-12-??
 ## Added
-- Fix error on query sort not working #19
-- Sort columns with the primary key first, then any index, and then the rest alphabetically #10
+- Fix error on query sort not working [#19](/../../issues/19)
+- Sort columns with the primary key first, then any index, and then the rest alphabetically [#10](/../../issues/10)
 
 ## Changed
 
