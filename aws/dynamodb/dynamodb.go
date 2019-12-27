@@ -172,8 +172,6 @@ func scanPages(
 	writer *csv.Writer) ([]string, error) {
 
 	processed := 0
-	// do not sort user defined columns
-	sorted := columns != ""
 	scan := dynamodb.ScanInput{TableName: aws.String(table)}
 	if limit > 0 {
 		scan.Limit = aws.Int64(int64(limit))
@@ -181,44 +179,10 @@ func scanPages(
 	attributesSet := make(map[string]bool)
 	err := svc.ScanPages(&scan,
 		func(page *dynamodb.ScanOutput, lastPage bool) bool {
-			for _, item := range page.Items {
-				records := make(map[string]string)
-				for k, av := range item {
-					value, handled := getValue(av)
-					if !handled {
-						continue
-					}
-					if columns == "" {
-						if _, skip := skipAttributes[k]; !skip && !attributesSet[k] {
-							attributesSet[k] = true
-							attributes = append(attributes, k)
-						}
-					}
-					records[k] = value
-				}
-				if !sorted {
-					sort.Slice(attributes, func(i, j int) bool {
-						return attributes[i] < attributes[j]
-					})
-					sorted = true
-				}
-				orderedRecords := make([]string, 0, len(attributes))
-				for _, attr := range attributes {
-					if value, ok := records[attr]; ok {
-						orderedRecords = append(orderedRecords, value)
-					} else {
-						orderedRecords = append(orderedRecords, "")
-					}
-				}
-				_ = writer.Write(orderedRecords)
-				processed++
-				if limit > 0 && processed == int(limit) {
-					writer.Flush()
-					return false
-				}
-			}
-			writer.Flush()
-			return !lastPage
+			done := false
+			attributes, attributesSet, processed, done = process(
+				page.Items, columns, attributes, skipAttributes, attributesSet, limit, processed, writer)
+			return !done && !lastPage
 		})
 	return attributes, err
 }
@@ -235,8 +199,6 @@ func queryPages(
 	writer *csv.Writer) ([]string, error) {
 
 	processed := 0
-	// do not sort user defined columns
-	sorted := columns != ""
 	desc, err := svc.DescribeTable(&dynamodb.DescribeTableInput{TableName: aws.String(table)})
 	if err != nil {
 		log.Panicf("error fetching table %s description %v", table, err)
@@ -266,46 +228,63 @@ func queryPages(
 	attributesSet := make(map[string]bool)
 	err = svc.QueryPages(&query,
 		func(page *dynamodb.QueryOutput, lastPage bool) bool {
-			for _, item := range page.Items {
-				records := make(map[string]string)
-				for k, av := range item {
-					value, handled := getValue(av)
-					if !handled {
-						continue
-					}
-					if columns == "" {
-						if _, skip := skipAttributes[k]; !skip && !attributesSet[k] {
-							attributesSet[k] = true
-							attributes = append(attributes, k)
-						}
-					}
-					records[k] = value
-				}
-				if !sorted {
-					sort.Slice(attributes, func(i, j int) bool {
-						return attributes[i] < attributes[j]
-					})
-					sorted = true
-				}
-				orderedRecords := make([]string, 0, len(attributes))
-				for _, attr := range attributes {
-					if value, ok := records[attr]; ok {
-						orderedRecords = append(orderedRecords, value)
-					} else {
-						orderedRecords = append(orderedRecords, "")
-					}
-				}
-				_ = writer.Write(orderedRecords)
-				processed++
-				if limit > 0 && processed == int(limit) {
-					writer.Flush()
-					return false
-				}
-			}
-			writer.Flush()
-			return !lastPage
+			done := false
+			attributes, attributesSet, processed, done = process(
+				page.Items, columns, attributes, skipAttributes, attributesSet, limit, processed, writer)
+			return !done && !lastPage
 		})
 	return attributes, err
+}
+
+func process(
+	items []map[string]*dynamodb.AttributeValue,
+	columns string,
+	attributes []string,
+	skipAttributes map[string]bool,
+	attributesSet map[string]bool,
+	limit uint,
+	processed int,
+	writer *csv.Writer) ([]string, map[string]bool, int, bool) {
+	// do not sort user defined columns
+	sorted := columns != ""
+	for _, item := range items {
+		records := make(map[string]string)
+		for k, av := range item {
+			value, handled := getValue(av)
+			if !handled {
+				continue
+			}
+			if columns == "" {
+				if _, skip := skipAttributes[k]; !skip && !attributesSet[k] {
+					attributesSet[k] = true
+					attributes = append(attributes, k)
+				}
+			}
+			records[k] = value
+		}
+		if !sorted {
+			sort.Slice(attributes, func(i, j int) bool {
+				return attributes[i] < attributes[j]
+			})
+			sorted = true
+		}
+		orderedRecords := make([]string, 0, len(attributes))
+		for _, attr := range attributes {
+			if value, ok := records[attr]; ok {
+				orderedRecords = append(orderedRecords, value)
+			} else {
+				orderedRecords = append(orderedRecords, "")
+			}
+		}
+		_ = writer.Write(orderedRecords)
+		processed++
+		if limit > 0 && processed == int(limit) {
+			writer.Flush()
+			return attributes, attributesSet, processed, true
+		}
+	}
+	writer.Flush()
+	return attributes, attributesSet, processed, false
 }
 
 func getValue(av *dynamodb.AttributeValue) (string, bool) {
