@@ -162,17 +162,18 @@ func action(c *cli.Context) error {
 	qp := &dynamodb.QueryParams{}
 	if hash != "" {
 		qp.Hash = hash
-		sorts := make([]string, 0)
+		setSortFlags := make([]string, 0)
 		for _, flag := range sortFlags {
 			if c.String(flag) != "" {
-				sorts = append(sorts, flag)
+				setSortFlags = append(setSortFlags, flag)
 			}
 		}
-		if len(sorts) > 1 {
-			return fmt.Errorf("only single sort condition is supported, but found %d: %v", len(sorts), sorts)
+		if len(setSortFlags) > 1 {
+			return fmt.Errorf("only single sort condition is supported, but found %d: %v", len(setSortFlags), setSortFlags)
 		}
-		if len(sorts) != 0 {
-			switch sort := c.String(sorts[0]); sort {
+		if len(setSortFlags) != 0 {
+			sortFlag := setSortFlags[0]
+			switch sort := c.String(sortFlag); sortFlag {
 			case sortFlagName:
 				qp.Sort = sort
 			case sortGtFlagName:
