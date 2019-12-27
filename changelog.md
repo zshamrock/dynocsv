@@ -9,7 +9,7 @@
 
 # [1.1.1] - 2019-12-27
 ## Added
-- Support to query on index if specified rather than on table
+- Support to query on index if specified rather than on table [#18](/../../issues/18)
 
 ## Changed
 
@@ -17,7 +17,7 @@
 
 # [1.1.0] - 2019-12-26
 ## Added
-- Support for --hash and --sort (sort, sort-gt, sort-ge, sort-lt, sort-le, sort-begins-with, sort-between) CLI arguments
+- Support for --hash and --sort (sort, sort-gt, sort-ge, sort-lt, sort-le, sort-begins-with, sort-between) CLI arguments [#15](/../../issues/15) [#16](/../../issues/16)
 
 ## Changed
 
