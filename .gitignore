@@ -19,3 +19,6 @@ vendor/
 
 # Snapcraft
 *.xdelta*
+
+# Releases
+releases/
