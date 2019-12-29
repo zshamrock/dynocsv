@@ -3,6 +3,7 @@ package dynamodb
 import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
 	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
 	"reflect"
 	"testing"
@@ -703,6 +704,316 @@ func TestQueryParamsKeyConditionExpression(t *testing.T) {
 				t.Errorf("keyConditionExpression() = %v, %v, %v, want %v, %v, %v",
 					aws.StringValue(expr.KeyCondition()), expr.Values(), expr.Names(),
 					aws.StringValue(tt.want.KeyCondition()), tt.want.Values(), tt.want.Names())
+			}
+		})
+	}
+}
+
+type mockDynamoDBClient struct {
+	dynamodbiface.DynamoDBAPI
+}
+
+func (m mockDynamoDBClient) Scan(input *dynamodb.ScanInput) (*dynamodb.ScanOutput, error) {
+	switch aws.StringValue(input.TableName) {
+	case "t1":
+		return &dynamodb.ScanOutput{Items: []map[string]*dynamodb.AttributeValue{
+			{
+				"Z":  {S: aws.String("z")},
+				"B":  {S: aws.String("b")},
+				"C":  {S: aws.String("c")},
+				"A":  {S: aws.String("a")},
+				"Id": {S: aws.String("id")},
+			},
+		}}, nil
+	case "t2":
+		return &dynamodb.ScanOutput{Items: []map[string]*dynamodb.AttributeValue{
+			{
+				"Z":   {S: aws.String("z")},
+				"B":   {S: aws.String("b")},
+				"C":   {S: aws.String("c")},
+				"A":   {S: aws.String("a")},
+				"Id1": {S: aws.String("id1")},
+				"Id2": {S: aws.String("id2")},
+			},
+		}}, nil
+	case "t3":
+		return &dynamodb.ScanOutput{Items: []map[string]*dynamodb.AttributeValue{
+			{
+				"Z":  {S: aws.String("z")},
+				"B":  {S: aws.String("b")},
+				"C":  {S: aws.String("c")},
+				"A":  {S: aws.String("a")},
+				"Id": {S: aws.String("id")},
+				"T1": {S: aws.String("t1")},
+			},
+		}}, nil
+	case "t4":
+		return &dynamodb.ScanOutput{Items: []map[string]*dynamodb.AttributeValue{
+			{
+				"Z":  {S: aws.String("z")},
+				"B":  {S: aws.String("b")},
+				"C":  {S: aws.String("c")},
+				"A":  {S: aws.String("a")},
+				"Id": {S: aws.String("id")},
+				"T1": {S: aws.String("t1")},
+				"T2": {S: aws.String("t2")},
+			},
+		}}, nil
+	case "t5":
+		return &dynamodb.ScanOutput{Items: []map[string]*dynamodb.AttributeValue{
+			{
+				"Z":  {S: aws.String("z")},
+				"B":  {S: aws.String("b")},
+				"C":  {S: aws.String("c")},
+				"A":  {S: aws.String("a")},
+				"Id": {S: aws.String("id")},
+				"T1": {S: aws.String("t1")},
+				"T2": {S: aws.String("t2")},
+				"T3": {S: aws.String("t3")},
+			},
+		}}, nil
+	case "t6":
+		return &dynamodb.ScanOutput{Items: []map[string]*dynamodb.AttributeValue{
+			{
+				"Z":  {S: aws.String("z")},
+				"B":  {S: aws.String("b")},
+				"C":  {S: aws.String("c")},
+				"A":  {S: aws.String("a")},
+				"Id": {S: aws.String("id")},
+				"T1": {S: aws.String("t1")},
+				"T2": {S: aws.String("t2")},
+				"T3": {S: aws.String("t3")},
+				"T4": {S: aws.String("t4")},
+			},
+		}}, nil
+	}
+	return nil, nil
+}
+
+func TestDefineBaselineAttributes(t *testing.T) {
+	type args struct {
+		svc            dynamodbiface.DynamoDBAPI
+		table          *dynamodb.TableDescription
+		indexes        []*dynamodb.GlobalSecondaryIndexDescription
+		index          string
+		skipAttributes map[string]bool
+	}
+	tests := []struct {
+		name  string
+		args  args
+		want1 []string
+		want2 map[string]bool
+	}{
+		{
+			name: "table with only hash key and no indexes",
+			args: args{
+				svc: mockDynamoDBClient{},
+				table: &dynamodb.TableDescription{
+					TableName: aws.String("t1"),
+					KeySchema: []*dynamodb.KeySchemaElement{{AttributeName: aws.String("Id"), KeyType: aws.String(dynamodb.KeyTypeHash)}}},
+				indexes:        []*dynamodb.GlobalSecondaryIndexDescription{},
+				index:          "",
+				skipAttributes: map[string]bool{},
+			},
+			want1: []string{"Id", "A", "B", "C", "Z"},
+			want2: map[string]bool{"Id": true, "A": true, "B": true, "C": true, "Z": true},
+		},
+		{
+			name: "table with hash and sort keys and no indexes",
+			args: args{
+				svc: mockDynamoDBClient{},
+				table: &dynamodb.TableDescription{
+					TableName: aws.String("t2"),
+					KeySchema: []*dynamodb.KeySchemaElement{
+						{AttributeName: aws.String("Id1"), KeyType: aws.String(dynamodb.KeyTypeHash)},
+						{AttributeName: aws.String("Id2"), KeyType: aws.String(dynamodb.KeyTypeRange)}},
+				},
+				indexes:        []*dynamodb.GlobalSecondaryIndexDescription{},
+				index:          "",
+				skipAttributes: map[string]bool{},
+			},
+			want1: []string{"Id1", "Id2", "A", "B", "C", "Z"},
+			want2: map[string]bool{"Id1": true, "Id2": true, "A": true, "B": true, "C": true, "Z": true},
+		},
+		{
+			name: "table with only hash key and one index with hash key",
+			args: args{
+				svc: mockDynamoDBClient{},
+				table: &dynamodb.TableDescription{
+					TableName: aws.String("t3"),
+					KeySchema: []*dynamodb.KeySchemaElement{{AttributeName: aws.String("Id"), KeyType: aws.String(dynamodb.KeyTypeHash)}}},
+				indexes: []*dynamodb.GlobalSecondaryIndexDescription{
+					{
+						IndexName: aws.String("i1"),
+						KeySchema: []*dynamodb.KeySchemaElement{
+							{AttributeName: aws.String("T1"), KeyType: aws.String(dynamodb.KeyTypeHash)}},
+					}},
+				index:          "",
+				skipAttributes: map[string]bool{},
+			},
+			want1: []string{"Id", "T1", "A", "B", "C", "Z"},
+			want2: map[string]bool{"Id": true, "T1": true, "A": true, "B": true, "C": true, "Z": true},
+		},
+		{
+			name: "table with only hash key and one index with hash and sort keys",
+			args: args{
+				svc: mockDynamoDBClient{},
+				table: &dynamodb.TableDescription{
+					TableName: aws.String("t4"),
+					KeySchema: []*dynamodb.KeySchemaElement{{AttributeName: aws.String("Id"), KeyType: aws.String(dynamodb.KeyTypeHash)}}},
+				indexes: []*dynamodb.GlobalSecondaryIndexDescription{
+					{
+						IndexName: aws.String("i1"),
+						KeySchema: []*dynamodb.KeySchemaElement{
+							{AttributeName: aws.String("T1"), KeyType: aws.String(dynamodb.KeyTypeHash)},
+							{AttributeName: aws.String("T2"), KeyType: aws.String(dynamodb.KeyTypeRange)}},
+					}},
+				index:          "",
+				skipAttributes: map[string]bool{},
+			},
+			want1: []string{"Id", "T1", "T2", "A", "B", "C", "Z"},
+			want2: map[string]bool{"Id": true, "T1": true, "T2": true, "A": true, "B": true, "C": true, "Z": true},
+		},
+		{
+			name: "table with only hash key and one index with hash and sort keys sorted by index",
+			args: args{
+				svc: mockDynamoDBClient{},
+				table: &dynamodb.TableDescription{
+					TableName: aws.String("t4"),
+					KeySchema: []*dynamodb.KeySchemaElement{{AttributeName: aws.String("Id"), KeyType: aws.String(dynamodb.KeyTypeHash)}}},
+				indexes: []*dynamodb.GlobalSecondaryIndexDescription{
+					{
+						IndexName: aws.String("i1"),
+						KeySchema: []*dynamodb.KeySchemaElement{
+							{AttributeName: aws.String("T1"), KeyType: aws.String(dynamodb.KeyTypeHash)},
+							{AttributeName: aws.String("T2"), KeyType: aws.String(dynamodb.KeyTypeRange)}},
+					}},
+				index:          "i1",
+				skipAttributes: map[string]bool{},
+			},
+			want1: []string{"T1", "T2", "Id", "A", "B", "C", "Z"},
+			want2: map[string]bool{"Id": true, "T1": true, "T2": true, "A": true, "B": true, "C": true, "Z": true},
+		},
+		{
+			name: "table with only hash key and 2 indexes with hash and sort keys",
+			args: args{
+				svc: mockDynamoDBClient{},
+				table: &dynamodb.TableDescription{
+					TableName: aws.String("t5"),
+					KeySchema: []*dynamodb.KeySchemaElement{{AttributeName: aws.String("Id"), KeyType: aws.String(dynamodb.KeyTypeHash)}}},
+				indexes: []*dynamodb.GlobalSecondaryIndexDescription{
+					{
+						IndexName: aws.String("i1"),
+						KeySchema: []*dynamodb.KeySchemaElement{
+							{AttributeName: aws.String("T1"), KeyType: aws.String(dynamodb.KeyTypeHash)},
+							{AttributeName: aws.String("T2"), KeyType: aws.String(dynamodb.KeyTypeRange)}},
+					},
+					{
+						IndexName: aws.String("i2"),
+						KeySchema: []*dynamodb.KeySchemaElement{
+							{AttributeName: aws.String("T3"), KeyType: aws.String(dynamodb.KeyTypeHash)}},
+					}},
+				index:          "",
+				skipAttributes: map[string]bool{},
+			},
+			want1: []string{"Id", "T1", "T2", "T3", "A", "B", "C", "Z"},
+			want2: map[string]bool{"Id": true, "T1": true, "T2": true, "T3": true, "A": true, "B": true, "C": true, "Z": true},
+		},
+		{
+			name: "table with only hash key and 2 indexes with hash and sort keys sorted by index",
+			args: args{
+				svc: mockDynamoDBClient{},
+				table: &dynamodb.TableDescription{
+					TableName: aws.String("t5"),
+					KeySchema: []*dynamodb.KeySchemaElement{{AttributeName: aws.String("Id"), KeyType: aws.String(dynamodb.KeyTypeHash)}}},
+				indexes: []*dynamodb.GlobalSecondaryIndexDescription{
+					{
+						IndexName: aws.String("i1"),
+						KeySchema: []*dynamodb.KeySchemaElement{
+							{AttributeName: aws.String("T1"), KeyType: aws.String(dynamodb.KeyTypeHash)},
+							{AttributeName: aws.String("T2"), KeyType: aws.String(dynamodb.KeyTypeRange)}},
+					},
+					{
+						IndexName: aws.String("i2"),
+						KeySchema: []*dynamodb.KeySchemaElement{
+							{AttributeName: aws.String("T3"), KeyType: aws.String(dynamodb.KeyTypeHash)}},
+					}},
+				index:          "i2",
+				skipAttributes: map[string]bool{},
+			},
+			want1: []string{"T3", "Id", "T1", "T2", "A", "B", "C", "Z"},
+			want2: map[string]bool{"Id": true, "T1": true, "T2": true, "T3": true, "A": true, "B": true, "C": true, "Z": true},
+		},
+		{
+			name: "table with hash and sort keys, 2 indexes with hash and sort keys, table and index sharing same keys",
+			args: args{
+				svc: mockDynamoDBClient{},
+				table: &dynamodb.TableDescription{
+					TableName: aws.String("t6"),
+					KeySchema: []*dynamodb.KeySchemaElement{
+						{AttributeName: aws.String("Id"), KeyType: aws.String(dynamodb.KeyTypeHash)},
+						{AttributeName: aws.String("T4"), KeyType: aws.String(dynamodb.KeyTypeRange)},
+					}},
+				indexes: []*dynamodb.GlobalSecondaryIndexDescription{
+					{
+						IndexName: aws.String("i1"),
+						KeySchema: []*dynamodb.KeySchemaElement{
+							{AttributeName: aws.String("T1"), KeyType: aws.String(dynamodb.KeyTypeHash)},
+							{AttributeName: aws.String("T2"), KeyType: aws.String(dynamodb.KeyTypeRange)}},
+					},
+					{
+						IndexName: aws.String("i2"),
+						KeySchema: []*dynamodb.KeySchemaElement{
+							{AttributeName: aws.String("T3"), KeyType: aws.String(dynamodb.KeyTypeHash)},
+							{AttributeName: aws.String("T4"), KeyType: aws.String(dynamodb.KeyTypeRange)},
+						},
+					}},
+				index:          "",
+				skipAttributes: map[string]bool{},
+			},
+			want1: []string{"Id", "T4", "T1", "T2", "T3", "A", "B", "C", "Z"},
+			want2: map[string]bool{"Id": true, "T1": true, "T2": true, "T3": true, "T4": true, "A": true, "B": true, "C": true, "Z": true},
+		},
+		{
+			name: "table with hash and sort keys, 2 indexes with hash and sort keys, table and index sharing same " +
+				"keys sorted by index",
+			args: args{
+				svc: mockDynamoDBClient{},
+				table: &dynamodb.TableDescription{
+					TableName: aws.String("t6"),
+					KeySchema: []*dynamodb.KeySchemaElement{
+						{AttributeName: aws.String("Id"), KeyType: aws.String(dynamodb.KeyTypeHash)},
+						{AttributeName: aws.String("T4"), KeyType: aws.String(dynamodb.KeyTypeRange)},
+					}},
+				indexes: []*dynamodb.GlobalSecondaryIndexDescription{
+					{
+						IndexName: aws.String("i1"),
+						KeySchema: []*dynamodb.KeySchemaElement{
+							{AttributeName: aws.String("T1"), KeyType: aws.String(dynamodb.KeyTypeHash)},
+							{AttributeName: aws.String("T2"), KeyType: aws.String(dynamodb.KeyTypeRange)}},
+					},
+					{
+						IndexName: aws.String("i2"),
+						KeySchema: []*dynamodb.KeySchemaElement{
+							{AttributeName: aws.String("T3"), KeyType: aws.String(dynamodb.KeyTypeHash)},
+							{AttributeName: aws.String("T4"), KeyType: aws.String(dynamodb.KeyTypeRange)},
+						},
+					}},
+				index:          "i1",
+				skipAttributes: map[string]bool{},
+			},
+			want1: []string{"T1", "T2", "Id", "T4", "T3", "A", "B", "C", "Z"},
+			want2: map[string]bool{"Id": true, "T1": true, "T2": true, "T3": true, "T4": true, "A": true, "B": true, "C": true, "Z": true},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1 := defineBaselineAttributes(tt.args.svc, tt.args.table, tt.args.indexes, tt.args.index, tt.args.skipAttributes)
+			if !reflect.DeepEqual(got, tt.want1) {
+				t.Errorf("defineBaselineAttributes() got = %v, want %v", got, tt.want1)
+			}
+			if !reflect.DeepEqual(got1, tt.want2) {
+				t.Errorf("defineBaselineAttributes() got1 = %v, want %v", got1, tt.want2)
 			}
 		})
 	}

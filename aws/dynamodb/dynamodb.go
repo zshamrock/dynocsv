@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
 	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
 	awssessions "github.com/zshamrock/dynocsv/aws"
 	"io"
@@ -150,11 +151,23 @@ func ExportToCSV(
 			skipAttributes[attr] = true
 		}
 	}
+	var desc *dynamodb.TableDescription
+	attributesSet := make(map[string]bool)
+	if columns == "" {
+		output, err := svc.DescribeTable(&dynamodb.DescribeTableInput{TableName: aws.String(table)})
+		if err != nil {
+			log.Panicf("error fetching table %s description %v", table, err)
+		}
+		desc = output.Table
+		attributes, attributesSet = defineBaselineAttributes(
+			svc, desc, desc.GlobalSecondaryIndexes, index, skipAttributes)
+	}
 	var err error
 	if qp.isEmpty() {
-		attributes, err = scanPages(svc, table, columns, limit, attributes, skipAttributes, writer)
+		attributes, err = scanPages(svc, table, columns, limit, attributes, skipAttributes, attributesSet, writer)
 	} else {
-		attributes, err = queryPages(svc, table, index, qp, columns, limit, attributes, skipAttributes, writer)
+		attributes, err = queryPages(
+			svc, desc, table, index, qp, columns, limit, attributes, skipAttributes, attributesSet, writer)
 	}
 	if err != nil {
 		log.Panic(err)
@@ -169,14 +182,14 @@ func scanPages(
 	limit uint,
 	attributes []string,
 	skipAttributes map[string]bool,
+	attributesSet map[string]bool,
 	writer *csv.Writer) ([]string, error) {
 
-	processed := 0
 	scan := dynamodb.ScanInput{TableName: aws.String(table)}
 	if limit > 0 {
 		scan.Limit = aws.Int64(int64(limit))
 	}
-	attributesSet := make(map[string]bool)
+	processed := 0
 	err := svc.ScanPages(&scan,
 		func(page *dynamodb.ScanOutput, lastPage bool) bool {
 			done := false
@@ -189,6 +202,7 @@ func scanPages(
 
 func queryPages(
 	svc *dynamodb.DynamoDB,
+	desc *dynamodb.TableDescription,
 	table string,
 	index string,
 	qp *QueryParams,
@@ -196,16 +210,20 @@ func queryPages(
 	limit uint,
 	attributes []string,
 	skipAttributes map[string]bool,
+	attributesSet map[string]bool,
 	writer *csv.Writer) ([]string, error) {
 
-	processed := 0
-	desc, err := svc.DescribeTable(&dynamodb.DescribeTableInput{TableName: aws.String(table)})
-	if err != nil {
-		log.Panicf("error fetching table %s description %v", table, err)
+	if desc == nil {
+		output, err := svc.DescribeTable(&dynamodb.DescribeTableInput{TableName: aws.String(table)})
+		if err != nil {
+			log.Panicf("error fetching table %s description %v", table, err)
+		}
+		desc = output.Table
 	}
-	var keySchema = desc.Table.KeySchema
+
+	var keySchema = desc.KeySchema
 	if index != "" {
-		indexes := desc.Table.GlobalSecondaryIndexes
+		indexes := desc.GlobalSecondaryIndexes
 		for _, idx := range indexes {
 			if aws.StringValue(idx.IndexName) == index {
 				keySchema = idx.KeySchema
@@ -213,7 +231,7 @@ func queryPages(
 			}
 		}
 	}
-	expr := qp.keyConditionExpression(keySchema, desc.Table.AttributeDefinitions)
+	expr := qp.keyConditionExpression(keySchema, desc.AttributeDefinitions)
 	query := dynamodb.QueryInput{
 		TableName:                 aws.String(table),
 		KeyConditionExpression:    expr.KeyCondition(),
@@ -225,8 +243,8 @@ func queryPages(
 	if limit > 0 {
 		query.Limit = aws.Int64(int64(limit))
 	}
-	attributesSet := make(map[string]bool)
-	err = svc.QueryPages(&query,
+	processed := 0
+	err := svc.QueryPages(&query,
 		func(page *dynamodb.QueryOutput, lastPage bool) bool {
 			done := false
 			attributes, attributesSet, processed, done = process(
@@ -234,6 +252,97 @@ func queryPages(
 			return !done && !lastPage
 		})
 	return attributes, err
+}
+
+// Gets one single item from the table (using scan), and build the baseline attributes out of there, where table's
+// primary keys are coming first, then all indexes' (by alphabetical order) keys next, and all the rest detected
+// attributes from the scan result by the alphabetical order.
+// Although if the index is set, then index's attributes will come first, then table's next, and all remaining indexes'
+// after.
+func defineBaselineAttributes(
+	svc dynamodbiface.DynamoDBAPI,
+	table *dynamodb.TableDescription,
+	indexes []*dynamodb.GlobalSecondaryIndexDescription,
+	index string,
+	skipAttributes map[string]bool) ([]string, map[string]bool) {
+
+	attributes := make([]string, 0)
+	attributesSet := make(map[string]bool)
+	// sort indexes alphabetically by name
+	sort.Slice(indexes, func(i, j int) bool {
+		return aws.StringValue(indexes[i].IndexName) < aws.StringValue(indexes[j].IndexName)
+	})
+	for _, i := range indexes {
+		// if index is defined, i.e. not "", then append its key attributes first
+		if aws.StringValue(i.IndexName) == index {
+			attributes, attributesSet = appendKeyAttributes(i.KeySchema, attributes, attributesSet, skipAttributes)
+			break
+		}
+	}
+	attributes, attributesSet = appendKeyAttributes(table.KeySchema, attributes, attributesSet, skipAttributes)
+	for _, i := range indexes {
+		if aws.StringValue(i.IndexName) == index {
+			// if index is defined, i.e. not "", then we already processed it, so continue on other indexes
+			continue
+		}
+		attributes, attributesSet = appendKeyAttributes(i.KeySchema, attributes, attributesSet, skipAttributes)
+	}
+	scan := dynamodb.ScanInput{TableName: table.TableName, Limit: aws.Int64(1)}
+	if index != "" {
+		scan.IndexName = aws.String(index)
+	}
+	output, err := svc.Scan(&scan)
+	if err != nil {
+		log.Panicf("error fetching table %s item %v", aws.StringValue(table.TableName), err)
+	}
+	items := output.Items
+	if len(items) == 0 {
+		return []string{}, map[string]bool{}
+	}
+	item := items[0]
+	restAttributes := make([]string, 0)
+	for k, av := range item {
+		_, handled := getValue(av)
+		if !handled {
+			continue
+		}
+		if shouldAppendAttribute(k, attributesSet, skipAttributes) {
+			attributesSet[k] = true
+			restAttributes = append(restAttributes, k)
+		}
+	}
+	sort.Slice(restAttributes, func(i, j int) bool {
+		return restAttributes[i] < restAttributes[j]
+	})
+	attributes = append(attributes, restAttributes...)
+	return attributes, attributesSet
+}
+
+func appendKeyAttributes(
+	keys []*dynamodb.KeySchemaElement,
+	attributes []string,
+	attributesSet map[string]bool,
+	skipAttributes map[string]bool) ([]string, map[string]bool) {
+
+	hash := aws.StringValue(findHashKey(keys).AttributeName)
+	if shouldAppendAttribute(hash, attributesSet, skipAttributes) {
+		attributes = append(attributes, hash)
+		attributesSet[hash] = true
+	}
+	sortKey := findRangeKey(keys)
+	if sortKey != nil {
+		//noinspection GoImportUsedAsName
+		sort := aws.StringValue(sortKey.AttributeName)
+		if shouldAppendAttribute(sort, attributesSet, skipAttributes) {
+			attributes = append(attributes, sort)
+			attributesSet[sort] = true
+		}
+	}
+	return attributes, attributesSet
+}
+
+func shouldAppendAttribute(name string, attributesSet map[string]bool, skipAttributes map[string]bool) bool {
+	return !skipAttributes[name] && !attributesSet[name]
 }
 
 func process(
@@ -245,8 +354,6 @@ func process(
 	limit uint,
 	processed int,
 	writer *csv.Writer) ([]string, map[string]bool, int, bool) {
-	// do not sort user defined columns
-	sorted := columns != ""
 	for _, item := range items {
 		records := make(map[string]string)
 		for k, av := range item {
@@ -255,18 +362,12 @@ func process(
 				continue
 			}
 			if columns == "" {
-				if _, skip := skipAttributes[k]; !skip && !attributesSet[k] {
+				if shouldAppendAttribute(k, attributesSet, skipAttributes) {
 					attributesSet[k] = true
 					attributes = append(attributes, k)
 				}
 			}
 			records[k] = value
-		}
-		if !sorted {
-			sort.Slice(attributes, func(i, j int) bool {
-				return attributes[i] < attributes[j]
-			})
-			sorted = true
 		}
 		orderedRecords := make([]string, 0, len(attributes))
 		for _, attr := range attributes {
