@@ -40,13 +40,16 @@ var sortFlags = []string{
 	sortBetweenFlagName,
 }
 
-const appName = "dynocsv"
+const (
+	appName = "dynocsv"
+	version = "1.1.2"
+)
 
 func main() {
 	app := cli.NewApp()
 	app.Name = appName
 	app.Usage = `Export DynamoDB table into CSV file`
-	app.Version = "1.1.1"
+	app.Version = version
 	app.Author = "(c) Aliaksandr Kazlou"
 	app.Metadata = map[string]interface{}{"GitHub": "https://github.com/zshamrock/dynocsv"}
 	app.UsageText = fmt.Sprintf(`%s		 
