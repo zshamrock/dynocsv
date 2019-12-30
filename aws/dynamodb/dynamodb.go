@@ -38,6 +38,22 @@ type QueryParams struct {
 	SortBetween    []string
 }
 
+type writerBuffer struct {
+	flushed bool
+	limit   int
+	buffer  [][]string
+}
+
+func (wb *writerBuffer) flush(writer *csv.Writer, attributes []string) {
+	_ = writer.Write(attributes)
+	_ = writer.WriteAll(wb.buffer)
+	wb.flushed = true
+	wb.buffer = nil
+}
+
+var wb = &writerBuffer{flushed: false, limit: 1000, buffer: make([][]string, 0, 100)}
+var forceAttributesStdout = false
+
 func (qp *QueryParams) hashKeyConditionBuilder(
 	key *dynamodb.KeySchemaElement, definitions map[string]string) expression.KeyConditionBuilder {
 	attributeName := aws.StringValue(key.AttributeName)
@@ -137,13 +153,15 @@ func findKeyByType(keys []*dynamodb.KeySchemaElement, keyType string) *dynamodb.
 // ExportToCSV exports the result of the scan or query from the table into the corresponding CSV file using provided
 // table and other settings.
 func ExportToCSV(
-	profile string, table string, index string, qp *QueryParams, columns string, skipColumns string, limit uint, w io.Writer) []string {
+	profile string, table string, index string, qp *QueryParams, columns string, skipColumns string, limit uint, w io.Writer) ([]string, bool) {
 	svc := dynamodb.New(awssessions.GetSession(profile))
 	writer := csv.NewWriter(w)
 	attributes := make([]string, 0)
 	if columns != "" {
 		attributes = strings.Split(columns, columnsSeparator)
 		_ = writer.Write(attributes)
+		// Consider if columns are set do not use buffer and flush all directly to the writer
+		wb.flushed = true
 	}
 	skipAttributes := make(map[string]bool)
 	if skipColumns != "" {
@@ -172,7 +190,7 @@ func ExportToCSV(
 	if err != nil {
 		log.Panic(err)
 	}
-	return attributes
+	return attributes, forceAttributesStdout
 }
 
 func scanPages(
@@ -194,8 +212,8 @@ func scanPages(
 		func(page *dynamodb.ScanOutput, lastPage bool) bool {
 			done := false
 			attributes, attributesSet, processed, done = process(
-				page.Items, columns, attributes, skipAttributes, attributesSet, limit, processed, writer)
-			return !done && !lastPage
+				page.Items, columns, attributes, skipAttributes, attributesSet, limit, processed, lastPage, writer)
+			return !done
 		})
 	return attributes, err
 }
@@ -248,8 +266,8 @@ func queryPages(
 		func(page *dynamodb.QueryOutput, lastPage bool) bool {
 			done := false
 			attributes, attributesSet, processed, done = process(
-				page.Items, columns, attributes, skipAttributes, attributesSet, limit, processed, writer)
-			return !done && !lastPage
+				page.Items, columns, attributes, skipAttributes, attributesSet, limit, processed, lastPage, writer)
+			return !done
 		})
 	return attributes, err
 }
@@ -353,6 +371,7 @@ func process(
 	attributesSet map[string]bool,
 	limit uint,
 	processed int,
+	lastPage bool,
 	writer *csv.Writer) ([]string, map[string]bool, int, bool) {
 	for _, item := range items {
 		records := make(map[string]string)
@@ -364,6 +383,9 @@ func process(
 			if columns == "" {
 				if shouldAppendAttribute(k, attributesSet, skipAttributes) {
 					attributesSet[k] = true
+					if wb.flushed {
+						forceAttributesStdout = true
+					}
 					attributes = append(attributes, k)
 				}
 			}
@@ -377,15 +399,29 @@ func process(
 				orderedRecords = append(orderedRecords, "")
 			}
 		}
-		_ = writer.Write(orderedRecords)
+		if wb.flushed {
+			_ = writer.Write(orderedRecords)
+		} else {
+			wb.buffer = append(wb.buffer, orderedRecords)
+			if len(wb.buffer) >= wb.limit {
+				wb.flush(writer, attributes)
+			}
+		}
 		processed++
 		if limit > 0 && processed == int(limit) {
-			writer.Flush()
+			if wb.flushed {
+				writer.Flush()
+			} else {
+				wb.flush(writer, attributes)
+			}
 			return attributes, attributesSet, processed, true
 		}
 	}
+	if lastPage && !wb.flushed {
+		wb.flush(writer, attributes)
+	}
 	writer.Flush()
-	return attributes, attributesSet, processed, false
+	return attributes, attributesSet, processed, lastPage
 }
 
 func getValue(av *dynamodb.AttributeValue) (string, bool) {

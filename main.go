@@ -194,9 +194,9 @@ func action(c *cli.Context) error {
 			}
 		}
 	}
-	headers := dynamodb.ExportToCSV(
+	headers, force := dynamodb.ExportToCSV(
 		profile, table, c.String(indexFlagName), qp, columns, skipColumns, limit, bufio.NewWriter(file))
-	if columns == "" {
+	if columns == "" && force {
 		fmt.Println(strings.Join(headers, ","))
 	}
 	return file.Close()
