@@ -20,7 +20,7 @@ USAGE:
         [--output/-o                                   <output file name>]
 
 VERSION:
-   1.1.2
+   1.1.3
 
 AUTHOR:
    (c) Aliaksandr Kazlou

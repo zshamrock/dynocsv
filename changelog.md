@@ -1,3 +1,11 @@
+# [1.1.3] - 2019-12-31
+## Added
+- Set the columns in the resulting CSV file even if not provided by the user [#12](/../../issues/12)
+
+## Changed
+
+## Removed
+
 # [1.1.2] - 2019-12-29
 ## Added
 - Fix error on query sort not working [#19](/../../issues/19)

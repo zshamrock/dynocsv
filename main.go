@@ -42,7 +42,7 @@ var sortFlags = []string{
 
 const (
 	appName = "dynocsv"
-	version = "1.1.2"
+	version = "1.1.3"
 )
 
 func main() {
