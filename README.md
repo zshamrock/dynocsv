@@ -75,7 +75,7 @@ running:
 snap connect dynocsv:aws-config-credentials
 ```
 otherwise it fails to read the credentials and will fail with 
-> 019/10/24 17:34:14 MissingRegion: could not find region configuration
+> 2019/10/24 17:34:14 MissingRegion: could not find region configuration
    panic: MissingRegion: could not find region configuration
 
 ## Usage                                                                                                                                                     
