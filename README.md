@@ -35,14 +35,14 @@ GLOBAL OPTIONS:
    --skip-columns value, --sc value  columns skipped from export from the table, if omitted, all columns will be exported (muttaly exclusive with "columns")
    --limit value, -l value           limit number of records returned, if not set (i.e. 0) all items are fetched (default: 0)
    --profile value, -p value         AWS profile to use to connect to DynamoDB, otherwise the value from AWS_PROFILE env var is used if available, or then "default" if it is not set or empty
-   --hash value                      Limit query by hash value (eq/=)
-   --sort value                      Limit query by sort value (eq/=)
-   --sort-gt value                   Limit query by sort value (gt/>)
-   --sort-ge value                   Limit query by sort value (ge/>=)
-   --sort-lt value                   Limit query by sort value (lt/<)
-   --sort-le value                   Limit query by sort value (le/<=)
-   --sort-begins-with value          Limit query by sort value (begins with)
-   --sort-between value              Limit query by sort value (between), values are separated by comma, i.e. "value1,value2"
+   --hash value                      limit query by hash value (eq/=)
+   --sort value                      limit query by sort value (eq/=)
+   --sort-gt value                   limit query by sort value (gt/>)
+   --sort-ge value                   limit query by sort value (ge/>=)
+   --sort-lt value                   limit query by sort value (lt/<)
+   --sort-le value                   limit query by sort value (le/<=)
+   --sort-begins-with value          limit query by sort value (begins with)
+   --sort-between value              limit query by sort value (between), values are separated by comma, i.e. "value1,value2"
    --output value, -o value          output file, or the default <table name>.csv will be used
    --help, -h                        show help
    --version, -v                     print the version
