@@ -1,6 +1,8 @@
-# dynocsv <a href="https://www.producthunt.com/posts/dynocsv?utm_source=badge-featured&utm_medium=badge&utm_souce=badge-dynocsv" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=182854&theme=dark" alt="dynocsv - Exports DynamoDB table into CSV | Product Hunt Embed" style="width: 250px; height: 54px;" width="250px" height="54px" /></a>
+# dynocsv
 
-Exports DynamoDB table into CSV [![Build Status](https://travis-ci.org/zshamrock/vmx.svg?branch=master)](https://travis-ci.org/zshamrock/dynocsv) [![dynocsv](https://snapcraft.io/dynocsv/badge.svg)](https://snapcraft.io/dynocsv)                                                                                                                                                    
+Exports DynamoDB table into CSV [![Build Status](https://travis-ci.org/zshamrock/vmx.svg?branch=master)](https://travis-ci.org/zshamrock/dynocsv) [![dynocsv](https://snapcraft.io/dynocsv/badge.svg)](https://snapcraft.io/dynocsv)
+
+<a href="https://www.producthunt.com/posts/dynocsv?utm_source=badge-featured&utm_medium=badge&utm_souce=badge-dynocsv" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=182854&theme=dark" alt="dynocsv - Exports DynamoDB table into CSV | Product Hunt Embed" style="width: 250px; height: 54px;" width="250px" height="54px" /></a>                                                                                                                                                    
 
 ```
 NAME:
@@ -14,7 +16,7 @@ USAGE:
         [--limit/-l                                    <number>]
         [--profile/-p                                  <AWS profile>]
         [--index/-i                                    <index to query instead of table>]
-        [--hash                                            <hash value>]
+        [--hash                                        <hash value>]
         [--sort                                        <sort value>]
         [--sort-[gt, ge, lt, le, begins-with, between] <sort value>]
         [--output/-o                                   <output file name>]
