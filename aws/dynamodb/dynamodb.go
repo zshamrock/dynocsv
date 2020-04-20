@@ -46,7 +46,18 @@ type writerBuffer struct {
 
 func (wb *writerBuffer) flush(writer *csv.Writer, attributes []string) {
 	_ = writer.Write(attributes)
-	_ = writer.WriteAll(wb.buffer)
+	if wb.flushed {
+		_ = writer.WriteAll(wb.buffer)
+	} else {
+		// If buffer has not been flushed, the previous stored records might not be in sync with the latest attributes
+		// count, i.e. extra blank values have to be appended to each of such records
+		for _, records := range wb.buffer {
+			for len(records) != len(attributes) {
+				records = append(records, "")
+			}
+			_ = writer.Write(records)
+		}
+	}
 	wb.flushed = true
 	wb.buffer = nil
 }
