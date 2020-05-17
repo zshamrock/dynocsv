@@ -22,7 +22,7 @@ USAGE:
         [--output/-o                                   <output file name>]
 
 VERSION:
-   1.1.3
+   1.1.4
 
 AUTHOR:
    (c) Aliaksandr Kazlou
